@@ -1,0 +1,11 @@
+# ignore vendor folders
+/vendor/
+node_modules/
+
+# Local files
+.DS_Store
+.buildpath
+.project
+.settings
+.idea
+npm-debug.log

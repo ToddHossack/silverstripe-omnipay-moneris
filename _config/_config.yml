@@ -1,0 +1,34 @@
+---
+Name: omnipay-moneris-hpp
+After:
+  - 'framework/*'
+  - 'cms/*'
+---
+
+# Extensions
+Payment:
+  allowed_gateways:
+    - 'Moneris'
+  has_one:
+    Order: Order
+
+SilverStripe\Omnipay\Service\PurchaseService:
+  extensions: 
+    - PurchaseServiceExtension
+
+SilverStripe\Omnipay\PaymentGatewayController:
+  extensions:
+    - PaymentGatewayControllerExtension
+
+# Dev only
+PaymentPage_Controller:
+  allowed_actions: 
+    - mockgateway
+    - MockGatewayForm
+    
+---
+Only:
+  environment: 'live'
+---
+PaymentPage_Controller:
+  allowed_actions: []

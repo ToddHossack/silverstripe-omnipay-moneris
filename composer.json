@@ -1,0 +1,22 @@
+{
+	"name": "toddhossack/silverstripe-omnipay-moneris-hpp",
+	"description": "Integrates Omnipay Moneris HPP library with SilverStripe Omnipay",
+	"type": "silverstripe-module",
+	"keywords": ["silverstripe","theme","configuration"],
+	"authors": [
+		{
+			"name": "Todd Hossack",
+			"email": "todd@tiraki.com",
+			"role": "Developer"
+		}
+	],
+	"license": "BSD-3-Clause",
+	"require": {
+		"silverstripe/cms": "~3.1",
+		"silverstripe/framework": "~3.1",
+		"silverstripe/silverstripe-omnipay": "2.5.x",
+		"toddhossack/omnipay-moneris-hpp": "^1.0@dev",
+		"thossack/tkiutilty": "^1.0@dev"
+	},
+	"minimum-stability": "dev"
+}
