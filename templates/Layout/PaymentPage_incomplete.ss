@@ -1,11 +1,12 @@
-<div class="layout-main__inner" role="main">
+<div class="PaymentPage__layout" role="main">
 
-	<h1>$Title <% if $SubTitle %><br /><span class="subhead">$SubTitle</span><% end_if %></h1>
+	<h1>$Title</h1>
 
-	<div class="typography">
-		<% if $Content %>$Content<% end_if %>
-		incomplete
-		<% include FinanceOrder Order=$Order %>
+	<div class="PaymentPage__result PaymentPage__result--incomplete">
+
+	<h3>Payment Details</h3>
+
+	<% include PaymentDetails Payment=$Payment %>
 
 
 	</div>

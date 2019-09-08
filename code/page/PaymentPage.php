@@ -4,6 +4,14 @@ use SilverStripe\Omnipay\PaymentGatewayController;
 
 class PaymentPage extends Page 
 {
+    private static $db = [
+		'MerchantName' => 'Varchar(100)',
+		'MerchantAddress' => 'HtmlText',
+        'MerchantEmail' => 'Varchar(100)',
+        'MerchantPhone' => 'Varchar(30)',
+        'MerchantWebsite' => 'Varchar(255)'
+	];
+
     
 }
 
