@@ -15,7 +15,6 @@
 		"silverstripe/cms": "~3.1",
 		"silverstripe/framework": "~3.1",
 		"silverstripe/silverstripe-omnipay": "2.5.x",
-		"toddhossack/omnipay-moneris-hpp": "^1.0@dev",
 		"thossack/tkiutilty": "^1.0@dev"
 	},
 	"minimum-stability": "dev"
