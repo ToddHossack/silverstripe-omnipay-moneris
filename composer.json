@@ -1,5 +1,5 @@
 {
-	"name": "toddhossack/silverstripe-omnipay-moneris-hpp",
+	"name": "toddhossack/silverstripe-omnipay-moneris",
 	"description": "Integrates Omnipay Moneris HPP library with SilverStripe Omnipay",
 	"type": "silverstripe-module",
 	"keywords": ["silverstripe","theme","configuration"],
@@ -19,7 +19,7 @@
 		"thossack/tkiutility": "^0.1.0"
 	},
 	"extra": {
-		"installer-name": "omnipay-moneris-hpp"
+		"installer-name": "omnipay-moneris"
 	},
 	"minimum-stability": "dev"
 }
