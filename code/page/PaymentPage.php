@@ -1,6 +1,11 @@
 <?php
 
 use SilverStripe\Omnipay\PaymentGatewayController;
+use SilverStripe\Omnipay\Service\ServiceFactory;
+
+use Tki\Utility\ArrayUtility;
+use Tki\Utility\NumberUtility;
+
 
 class PaymentPage extends Page 
 {
@@ -34,7 +39,9 @@ class PaymentPage_Controller extends Page_Controller
     ];
     
     protected $errors = [];
-
+    
+    protected $order;
+    
     /*
 	|--------------------------------------------------------------------------
 	| Actions
@@ -166,34 +173,65 @@ class PaymentPage_Controller extends Page_Controller
 
     public function submitPaymentForm($data, Form $form)
     {
+        // Create payment
+        $payment = $this->createPurchasePayment($data,$form);
+
+        // Init session
+        $this->initPaymentSession(get_class($this),$payment);
         
-        /*
-         * Create payment
-         */
-        $payment = $this->createPaymentFromPaymentForm($data,$form);
-        
-        // Omnipay data
-        $gatewayData = $order->dataForGateway();
-        
-        // Add Moneris data
-        $gatewayData['rvar'] = [
-            'dept' => $order->Department,
-            'payfor' => $order->Item
-        ];
-        
-        $gatewayData['cust_id'] = $order->CustomerAccount;
-        
-        $this->initPaymentSession(get_class($this),$data);
+        // Gather gateway data
+        $gatewayData = $this->gatewayDataForPurchase($payment,$data,$form);
         
         // Use PurchaseService
         $service = ServiceFactory::create()->getService($payment, ServiceFactory::INTENT_PURCHASE);
 
-        // Initiate the payment
+        // Initiate the gateway purchase
         $response = $service->initiate($gatewayData);
-        //var_dump($response);
-        
+ 
         return $response->redirectOrRespond();
+    }
+    
+    /**
+     * Override in subclasses to customise.
+     * @param type $data
+     * @param type $form
+     */
+    protected function createPurchasePayment($data,$form)
+    {
+        // Create order
+        $this->order = FinanceOrder::create();
+        $form->saveInto($this->order,[
+            'FirstName',
+            'LastName',
+            'Email',
+            'Phone',
+            'Comments'
+        ]);
+        $this->order->write();
         
+        // Create payment
+        $amount = ArrayUtility::data_get($data,'Money.Amount');
+        $currency = ArrayUtility::data_get($data,'Money.Currency');
+        $formattedAmt = NumberUtility::format_currency($amount);
+        
+        $payment = Payment::create()->init('Moneris', $formattedAmt, $currency);
+        $payment->OrderID = $this->order->ID;
+        $payment->Identifier = $this->order->OrderNumber;
+        $payment->SuccessUrl = \Controller::join_links($this->Link(),'complete',$payment->Identifier);
+        $payment->FailureUrl = \Controller::join_links($this->Link(),'incomplete',$payment->Identifier);
+        
+        return $payment;
+    }
+    
+    /**
+     * Override in subclasses to gather white listed data for gateway. 
+     * @param \Payment $payment
+     * @param array $data
+     * @param \Form $form
+     */
+    protected function gatewayDataForPurchase($payment,$data,$form)
+    {
+        return $this->order->dataForGateway();
     }
     
     public function CompletedForm()
@@ -323,12 +361,12 @@ class PaymentPage_Controller extends Page_Controller
 	|--------------------------------------------------------------------------
 	*/	
 	
-    protected function initPaymentSession($name,$data=[])
+    protected function initPaymentSession($name,$payment)
     {
         $sessionTimeout = (int) $this->config()->get('session_timeout');
         
         $sessionData = [
-            //'payment_identifier' => 
+            'payment_identifier' => $payment->Identifier,
             'payment_submit_time' => ($sessionTimeout) ? time() + $sessionTimeout : 0
         ];
         
