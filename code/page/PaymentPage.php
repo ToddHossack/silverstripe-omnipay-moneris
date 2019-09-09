@@ -124,12 +124,12 @@ class PaymentPage_Controller extends Page_Controller
         /*
          * Fields
          */
-        $fields = $this->paymentFormFields(FieldList::create());
+        $fields = $this->paymentFormFields();
         
         /*
          * Actions
          */
-        $actions = $this->paymentFormActions(FieldList::create());
+        $actions = $this->paymentFormActions();
         
         /*
          * Validation
@@ -146,20 +146,22 @@ class PaymentPage_Controller extends Page_Controller
         return RequiredFields::create(['Money']);
     }
     
-    protected function paymentFormActions(&$fields)
+    protected function paymentFormActions()
     {
-        $fields->push(FormAction::create("submitPaymentForm")->setTitle("Submit"));
+        return FieldList::create(
+            FormAction::create("submitPaymentForm")->setTitle("Submit")
+        );
     }
     
     /**
      * Override in subclasses to customise
      * @param type $fields
      */
-    protected function paymentFormFields(&$fields)
+    protected function paymentFormFields()
     {
-        $moneyField = MoneyField::create('Money',_t('PaymentPage_Controller.Money','Payment amount'));
-        $fields->push($moneyField);
-        
+        return FieldList::create(
+            MoneyField::create('Money',_t('PaymentPage_Controller.Money','Payment amount'))
+        );
     }
 
     public function submitPaymentForm($data, Form $form)
