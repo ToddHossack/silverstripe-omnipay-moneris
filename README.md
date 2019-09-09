@@ -1,2 +1,2 @@
-# silverstripe-omnipay-moneris-hpp
+# silverstripe-omnipay-moneris
 SilverStripe integration of Omnipay Moneris HPP library
