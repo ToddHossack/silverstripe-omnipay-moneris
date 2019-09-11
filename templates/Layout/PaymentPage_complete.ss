@@ -2,16 +2,27 @@
 
 	<h1>$Title</h1>
 
-	complete
-	
-	<div class="PaymentPage__result PaymentPage__result--complete">
-		<h2>###value_result_data_title###<a href="#" class="button1" onClick="window.print()">Print</a></h2>
+	<div class="PaymentPage__errors">
 
-		<% include PaymentMerchant %>
+	</div>
+	<div class="PaymentResult PaymentResult--complete">
+		<h2 class="PaymentResult__heading">Test<a href="#" class="button button1" onClick="window.print()">Print</a></h2>
 
-		<h3>Payment Details</h3>
+		<div class="PaymentResult__section">
+			<% include PaymentMerchant %>
+			<h5>Payment page</h5>
+			<span class="PaymentPage__URL">$AbsoluteLink</span>
+		</div>
+		
+		<h3 class="PaymentResult__heading">Order Details</h3>
+		<div class="PaymentResult__section">
+			<% include PaymentOrderDetails Order=$Order %>
+		</div>
 
-		<% include PaymentDetails Payment=$Payment %>
+		<h3 class="PaymentResult__heading">Transaction Details</h3>
+		<div class="PaymentResult__section">
+			<% include PaymentDetails Payment=$Payment %>
+		</div>
 
 	</div>
 </div>

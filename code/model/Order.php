@@ -17,6 +17,10 @@ class Order extends DataObject
     
     private static $extensions = ['Payable'];
     
+    private static $result_fields = ['FirstName','LastName','Email','Phone','OrderNumber','Comments'];
+    
+    protected $_cachedResultFields;       // instance cache
+    
    /**
 	 * @config
 	 */
@@ -95,6 +99,27 @@ class Order extends DataObject
             'Comments' => _t('Order.Comments','Comments')
 		);
 	}
+    
+    public function ResultFields()
+    {
+        if(is_null($this->_cachedResultFields)) {
+            $fields = $this->config()->get('result_fields',Config::INHERITED);
+            $data = [];
+            $labels = $this->translatedLabels();
+
+            foreach($fields as $field) {
+                $data[$field] = [
+                    'field' => $field,
+                    'title' => isset($labels[$field]) ? $labels[$field] : $field,
+                    'value' => $this->get($field)
+                ];
+            }
+        
+            $this->_cachedResultFields = ArrayData::create($data);
+        }
+        
+        return $this->_cachedResultFields;
+    }
         
     /**
     * 

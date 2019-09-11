@@ -11,12 +11,47 @@ class PaymentPage extends Page
 {
     private static $db = [
 		'MerchantName' => 'Varchar(100)',
-		'MerchantAddress' => 'HtmlText',
         'MerchantEmail' => 'Varchar(100)',
         'MerchantPhone' => 'Varchar(30)',
-        'MerchantWebsite' => 'Varchar(255)'
+        'MerchantWebsite' => 'Varchar(100)',
+        'MerchantPhysicalAddress' => 'Text',
+        'MerchantPostalAddress' => 'Text',
 	];
 
+    private static $casting = [
+        'MerchantPhysicalAddressHTML' => 'HTMLText',
+        'MerchantPostalAddressHTML' => 'HTMLText',
+    ];
+    
+    public function getMerchantPhysicalAddressHTML()
+    {
+        return nl2br(strip_tags($this->MerchantPhysicalAddress));
+    }
+    
+    public function getMerchantPostalAddressHTML()
+    {
+        return nl2br(strip_tags($this->MerchantPostalAddress));
+    }
+    
+    public function getCMSFields()
+    {
+        $fields = parent::getCMSFields();
+        
+        $fields->findOrMakeTab('Root.Merchant',_t('PaymentPage.MerchantTab','Merchant Details'));
+
+        $fields->addFieldsToTab('Root.Merchant',[
+            TextField::create('MerchantName',_t('PaymentPage.MerchantName','Merchant Name'),null,100),
+            TextField::create('MerchantEmail',_t('PaymentPage.MerchantEmail','Email'),null,100),
+            TextField::create('MerchantPhone',_t('PaymentPage.MerchantName','Phone'),null,30),
+            TextField::create('MerchantWebsite',_t('PaymentPage.MerchantWebsite','Website'),null,100),
+            TextareaField::create('MerchantPhysicalAddress',_t('PaymentPage.MerchantPhysicalAddress','Physical Address')),
+            TextareaField::create('MerchantPostalAddress',_t('PaymentPage.MerchantPostalAddress','Postal Address')),
+        ]);
+        
+        return $fields;
+    }
+    
+    
     
 }
 
@@ -42,6 +77,8 @@ class PaymentPage_Controller extends Page_Controller
     
     protected $order;
     
+    private static $order_class = 'Order';
+    
     /*
 	|--------------------------------------------------------------------------
 	| Actions
@@ -50,20 +87,19 @@ class PaymentPage_Controller extends Page_Controller
     
     public function complete()
     {
-        echo __METHOD__;
         return $this->doResponse();
     }
     
     public function incomplete()
     {
-        echo __METHOD__;
         return $this->doResponse();
     }
     
     protected function doResponse()
     {
         $viewVars = [
-			'Payment' => null
+			'Payment' => null,
+            'Order' => null
 		];
         
         // Find and validate identifier
@@ -85,17 +121,19 @@ class PaymentPage_Controller extends Page_Controller
             $this->errors[] =  _t('PaymentPage_Controller.PaymentNotFound','Transaction details not found');
         } else {
             $viewVars['Payment'] = $payment;
+            $viewVars['Order'] = $payment->Order();
         }
-        $this->addResponseVars($viewVars,$payment);
-        return $this->showResponse($viewVars);
+        
+        $this->addResponseVars($viewVars);
+        $responseVars->setField('errors',$this->errors);
+        
     }
     
     /**
      * Override in sub-classes to customise template variables
      * @param array $vars
-     * @param \Payment $payment
      */
-    protected function addResponseVars(&$vars,$payment)
+    protected function addResponseVars(&$vars)
     {
         
     }
@@ -199,7 +237,8 @@ class PaymentPage_Controller extends Page_Controller
     protected function createPurchasePayment($data,$form)
     {
         // Create order
-        $this->order = FinanceOrder::create();
+        $orderClass = $this->config()->get('order_class',Config::UNINHERITED);
+        $this->order = $orderClass::create();
         $form->saveInto($this->order,[
             'FirstName',
             'LastName',
