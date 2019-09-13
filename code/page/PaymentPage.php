@@ -67,10 +67,9 @@ class PaymentPage_Controller extends Page_Controller
 
     private static $allowed_actions = [
         'PaymentForm',
-        'CompletedForm',
-        'StartOverForm',
-        'complete',
-        'incomplete'
+        //'CompletedForm',
+        //'StartOverForm',
+        'result',
     ];
     
     protected $errors = [];
@@ -79,27 +78,26 @@ class PaymentPage_Controller extends Page_Controller
     
     private static $order_class = 'Order';
     
+    public function init() 
+    {
+		parent::init();
+        if($this->request->getVar('start')) {
+            $this->clearPaymentSession(get_class($this));
+        }
+    }
     /*
 	|--------------------------------------------------------------------------
 	| Actions
 	|--------------------------------------------------------------------------
 	*/
     
-    public function complete()
-    {
-        return $this->doResponse();
-    }
     
-    public function incomplete()
-    {
-        return $this->doResponse();
-    }
-    
-    protected function doResponse()
+    protected function result()
     {
         $viewVars = [
-			'Payment' => null,
-            'Order' => null
+            'Result' => null,
+			'PaymentData' => null,
+            'OrderData' => null
 		];
         
         // Find and validate identifier
@@ -118,15 +116,16 @@ class PaymentPage_Controller extends Page_Controller
          */
         $payment = $this->findPaymentByIdentifier($identifier);
         if(!$payment) {
-            $this->errors[] =  _t('PaymentPage_Controller.PaymentNotFound','Transaction details not found');
+            $this->addError(_t('PaymentPage_Controller.PaymentNotFound','Transaction details not found'));
         } else {
             $viewVars['Payment'] = $payment;
-            $viewVars['Order'] = $payment->Order();
+            $viewVars['OrderData'] = $this->resultOrderData($payment);
+            $viewVars['Result'] = $this->resultFromPaymentStatus($payment);
         }
         
         $this->addResponseVars($viewVars);
-        $responseVars->setField('errors',$this->errors);
         
+        return $this->showResponse($viewVars);
     }
     
     /**
@@ -138,9 +137,44 @@ class PaymentPage_Controller extends Page_Controller
         
     }
     
+    protected function resultPaymentData($payment)
+    {
+        if(!$payment) {
+            return null;
+        }
+        $money = $payment->dbObject('Money');
+        $status = strtoupper($payment->Status);
+        $data = [
+            [
+                'Field' => 'Money',
+                'Title' => _t('Payment.MoneyAmount','Payment Amount'),
+                'Data' => $money->Nice()
+            ],
+            [
+                'Field' => 'Status',
+                'Title' => _t('Payment.Status', 'Status'),
+                'Data' => $payment->Status,
+                'TranslatedData' => _t('Payment.STATUS_'.strtoupper($payment->Status),$payment->Status)
+            ],
+            [
+                'Field' => 'Identifier',
+                'Title' => _t('Payment.Identifier', 'Reference No.'),
+                'Data' => $payment->Identifier
+            ]
+        ];
+        
+        return ArrayList::create($data);
+    }
+    
+    protected function resultOrderData($payment)
+    {
+        $order = $payment->Order();
+        return ($order) ? $order->resultData() : null;
+    }
+    
     protected function showResponse($vars)
     {
-        $vars['errors'] = $this->errors;
+        $vars['PaymentErrors'] = $this->paymentErrors;
         return $this->customise(ArrayData::create($vars));
     }
     
@@ -215,7 +249,7 @@ class PaymentPage_Controller extends Page_Controller
         $payment = $this->createPurchasePayment($data,$form);
 
         // Init session
-        $this->initPaymentSession(get_class($this),$payment);
+        $this->initPaymentSession($payment);
         
         // Gather gateway data
         $gatewayData = $this->gatewayDataForPurchase($payment,$data,$form);
@@ -256,8 +290,8 @@ class PaymentPage_Controller extends Page_Controller
         $payment = Payment::create()->init('Moneris', $formattedAmt, $currency);
         $payment->OrderID = $this->order->ID;
         $payment->Identifier = $this->order->OrderNumber;
-        $payment->SuccessUrl = \Controller::join_links($this->Link(),'complete',$payment->Identifier);
-        $payment->FailureUrl = \Controller::join_links($this->Link(),'incomplete',$payment->Identifier);
+        $payment->SuccessUrl = \Controller::join_links($this->Link(),'result',$payment->Identifier);
+        $payment->FailureUrl = \Controller::join_links($this->Link(),'result',$payment->Identifier);
         
         return $payment;
     }
@@ -273,6 +307,7 @@ class PaymentPage_Controller extends Page_Controller
         return $this->order->dataForGateway();
     }
     
+    /*
     public function CompletedForm()
     {
         $fields = FieldList::create();
@@ -295,6 +330,13 @@ class PaymentPage_Controller extends Page_Controller
         $form = Form::create($this, 'StartOverForm', $fields, $actions, null);
 
         return $form;
+    }
+     * 
+     */
+    
+    public function StartLink()
+    {
+        return \Controller::join_links($this->Link(),'?start=1');
     }
     
     /*
@@ -377,7 +419,7 @@ class PaymentPage_Controller extends Page_Controller
     {
         // Validate order ID
 		if(empty($identifier) || !preg_match('/^(([1-9][0-9]*)-[0-9]{12,12})(-[a-z0-9]+)?$/',$identifier)) {
-			$this->errors[] =  _t('PaymentPage_Controller.InvalidIdentifier','Invalid payment identifier');
+			$this->addError(_t('PaymentPage_Controller.InvalidIdentifier','Invalid payment identifier'));
 			return false;
 		}
 		return true;
@@ -387,7 +429,7 @@ class PaymentPage_Controller extends Page_Controller
     {
 		// Validate order ID
 		if(empty($code) || !is_numeric($code)) {
-            $this->errors[] =  _t('PaymentPage_Controller.InvalidResponseCode','Invalid response code');
+            $this->addError(_t('PaymentPage_Controller.InvalidResponseCode','Invalid response code'));
 			return false;
 		}
 		return true;
@@ -400,7 +442,7 @@ class PaymentPage_Controller extends Page_Controller
 	|--------------------------------------------------------------------------
 	*/	
 	
-    protected function initPaymentSession($name,$payment)
+    protected function initPaymentSession($payment)
     {
         $sessionTimeout = (int) $this->config()->get('session_timeout');
         
@@ -409,9 +451,14 @@ class PaymentPage_Controller extends Page_Controller
             'payment_submit_time' => ($sessionTimeout) ? time() + $sessionTimeout : 0
         ];
         
-        Session::set($name,$sessionData);
+        Session::set(get_class($this),$sessionData);
     }
 	
+    protected function clearPaymentSession($name)
+    {
+        Session::clear(get_class($this));
+    }
+    
     /**
      * Checks whether user's payment session has expired
      * @param type $order
@@ -424,17 +471,18 @@ class PaymentPage_Controller extends Page_Controller
         if(!$sessionTimeout) {
             return true;
         }
+        
         // Compare time against expiry time
         $tstamp = (int) $this->sessionGet(get_class($this),'payment_submit_time');
         
         if(!$tstamp) {
-            $this->errors[] =  _t('PaymentPage_Controller.SessionInvalid','Session invalid');
+            $this->addError(_t('PaymentPage_Controller.SessionInvalid','Session invalid'));
             return false;
         }
         $expired = (time() - $tstamp) > $sessionTimeout;
         
         if($expired) {
-            $this->errors[] =  _t('PaymentPage_Controller.SessionExpired','Session expired');
+            $this->addError(_t('PaymentPage_Controller.SessionExpired','Sorry, your session has expired.'));
             return false;
         }
         
@@ -453,6 +501,44 @@ class PaymentPage_Controller extends Page_Controller
 	| Helpers
 	|--------------------------------------------------------------------------
 	*/	
+    
+    protected function resultFromPaymentStatus($payment)
+    {
+        if(!$payment) {
+            return _t('PaymentPage.Result_None','No result');
+        }
+        switch($payment->Status) {
+            case 'Created':
+            case 'PendingAuthorization':
+            case 'Authorized':
+            case 'PendingCreateCard':
+            case 'CardCreated':
+            case 'PendingPurchase':
+            case 'PendingCapture':
+                return _t('PaymentPage.Result_Completed','Payment Incomplete');
+                break;
+            case 'Captured':
+                return _t('PaymentPage.Result_Completed','Payment Completed');
+                break;
+            case 'PendingRefund':
+            case 'Refunded':
+            case 'PendingVoid':
+            case 'Void':
+                $status = strtoupper($payment->Status);
+                return _t('Payment.STATUS_'.$status, $payment->Status);
+                break;
+        }
+    }
+    
+    protected function addError($msg)
+    {
+        if(is_null($this->paymentErrors)) {
+            $this->paymentErrors = ArrayList::create();
+        }
+        $this->paymentErrors->push(ArrayData::create([
+            'Error' => $msg
+        ]));
+    }
     
     protected function getIdentifierFromRequest()
     {

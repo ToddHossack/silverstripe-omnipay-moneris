@@ -11,6 +11,8 @@ Payment:
     - 'Moneris'
   has_one:
     Order: Order
+  extensions:
+    - PaymentExtension
 
 SilverStripe\Omnipay\Service\PurchaseService:
   extensions: 

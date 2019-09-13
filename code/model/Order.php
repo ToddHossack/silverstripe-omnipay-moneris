@@ -19,7 +19,7 @@ class Order extends DataObject
     
     private static $result_fields = ['FirstName','LastName','Email','Phone','OrderNumber','Comments'];
     
-    protected $_cachedResultFields;       // instance cache
+    protected $_cachedResultData;       // instance cache
     
    /**
 	 * @config
@@ -93,32 +93,32 @@ class Order extends DataObject
 		return array(
 			'OrderNumber' => _t('Order.OrderNumber','Order Number'),
             'FirstName' => _t('Order.FirstName','First Name'),
-            'LastName' => _t('Order.LastName','Last Name'),
+            'LastName' => _t('Order.LastName','Last Name / Business Name'),
             'Email' => _t('Order.Email','Email'),
             'Phone' => _t('Order.Phone','Phone'),
             'Comments' => _t('Order.Comments','Comments')
 		);
 	}
     
-    public function ResultFields()
+    
+    public function resultData()
     {
-        if(is_null($this->_cachedResultFields)) {
-            $fields = $this->config()->get('result_fields',Config::INHERITED);
+
+        if(is_null($this->_cachedResultData)) {
+            $fields = $this->config()->get('result_fields',Config::UNINHERITED);
             $data = [];
             $labels = $this->translatedLabels();
-
             foreach($fields as $field) {
-                $data[$field] = [
-                    'field' => $field,
-                    'title' => isset($labels[$field]) ? $labels[$field] : $field,
-                    'value' => $this->get($field)
+                $data[] = [
+                    'Field' => $field,
+                    'Title' => isset($labels[$field]) ? $labels[$field] : $field,
+                    'Data' => $this->$field
                 ];
             }
-        
-            $this->_cachedResultFields = ArrayData::create($data);
+            $this->_cachedResultData = ArrayList::create($data);
         }
         
-        return $this->_cachedResultFields;
+        return $this->_cachedResultData;
     }
         
     /**
