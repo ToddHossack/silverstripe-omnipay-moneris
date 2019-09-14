@@ -62,7 +62,7 @@ class PaymentPage_Controller extends Page_Controller
      * Session timeout
      * @var int 
      */
-    private static $session_timeout = 3600;  // 1 hour
+    private static $session_timeout = 300;  // 1 hour
     
 
     private static $allowed_actions = [
@@ -95,6 +95,7 @@ class PaymentPage_Controller extends Page_Controller
     protected function result()
     {
         $viewVars = [
+            'Title' => 'Payment Result',
             'Result' => null,
 			'PaymentData' => null,
             'OrderData' => null
@@ -120,7 +121,8 @@ class PaymentPage_Controller extends Page_Controller
         } else {
             $viewVars['Payment'] = $payment;
             $viewVars['OrderData'] = $this->resultOrderData($payment);
-            $viewVars['Result'] = $this->resultFromPaymentStatus($payment);
+            $viewVars['Result'] = ArrayData::create($this->resultFromPaymentStatus($payment));
+            $viewVars['LastMessage'] = $payment->LastMessage();
         }
         
         $this->addResponseVars($viewVars);
@@ -137,7 +139,7 @@ class PaymentPage_Controller extends Page_Controller
         
     }
     
-    protected function resultPaymentData($payment)
+    protected function xresultPaymentData($payment)
     {
         if(!$payment) {
             return null;
@@ -505,8 +507,13 @@ class PaymentPage_Controller extends Page_Controller
     protected function resultFromPaymentStatus($payment)
     {
         if(!$payment) {
-            return _t('PaymentPage.Result_None','No result');
+            return [
+                'Code' => null,
+                'Title' => _t('PaymentPage.Result_None','No result'),
+                'Type' => _t('PaymentPage.ResultType_Error','No result'),
+            ];
         }
+
         switch($payment->Status) {
             case 'Created':
             case 'PendingAuthorization':
@@ -515,17 +522,29 @@ class PaymentPage_Controller extends Page_Controller
             case 'CardCreated':
             case 'PendingPurchase':
             case 'PendingCapture':
-                return _t('PaymentPage.Result_Completed','Payment Incomplete');
+                return [
+                    'Code' => 'Incomplete',
+                    'Title' => _t('PaymentPage.Result_Incomplete','Payment Incomplete'),
+                    'Type' =>  _t('PaymentPage.ResultType_Notice','Notice'),
+                ];
                 break;
             case 'Captured':
-                return _t('PaymentPage.Result_Completed','Payment Completed');
+                return [
+                    'Code' => 'Completed',
+                    'Title' => _t('PaymentPage.Result_Completed','Payment Completed'),
+                    'Type' =>  _t('PaymentPage.ResultType_Receipt','Receipt'),
+                ];
                 break;
             case 'PendingRefund':
             case 'Refunded':
             case 'PendingVoid':
             case 'Void':
                 $status = strtoupper($payment->Status);
-                return _t('Payment.STATUS_'.$status, $payment->Status);
+                return [
+                    'Code' => $payment->Status,
+                    'Title' => _t('Payment.STATUS_'.$status, $payment->Status),
+                    'Type' =>  _t('PaymentPage.ResultType_Notice','Notice')
+                ];
                 break;
         }
     }
