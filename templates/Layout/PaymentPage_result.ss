@@ -3,18 +3,22 @@
 	
 	<% if $PaymentErrors %>
 	<div class="PaymentPage__errors">
-		<h4><%t PaymentPage.Errors 'Errors' %></h4>
+		<h4><%t PaymentPage.Errors 'Errors' %> <a href="$StartLink" class="PaymentResult_action">Start again</a></h4>
 		<ul>
 		<% loop $PaymentErrors %>
 			<li>$Error</li>
 		<% end_loop %>
 		</ul>
-		<div class=""><a href="$StartLink" class="PaymentResult_action">Start again</a></div>
 	</div>
 
 	<% else %>
 	<div class="PaymentResult PaymentResult--$Result.Code.XML">
-		<h2 class="PaymentResult__heading">$Result.Title - $Result.Type
+		<h2 class="PaymentResult__heading">$Result.Type: $Result.Title
+			<% if $Result.Code == 'Completed' %>
+			<a href="$StartLink" class="PaymentResult_action">Done</a>
+			<% else %>
+			<a href="$StartLink" class="PaymentResult_action">Start again</a>
+			<% end_if %>
 			<a href="#" class="PaymentResult_action" onClick="window.print()">Print</a>
 		</h2>
 	
@@ -30,12 +34,15 @@
 			<% include PaymentOrderDetails Order=$OrderData %>
 		</div>
 		<% end_if %>
-		<% if $Payment %>
-		<h3 class="PaymentResult__heading">Transaction Details</h3>
+		<h3 class="PaymentResult__heading">Transaction Details </h3>
 		<div class="PaymentResult__section">
+			<% if $Payment %>
 			<% include PaymentDetails Payment=$Payment %>
+			<% else %>
+			No transaction details
+			<% end_if %>
 		</div>
-		<% end_if %>
 	</div>
 	<% end_if %>
+
 </div>

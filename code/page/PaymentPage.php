@@ -261,7 +261,11 @@ class PaymentPage_Controller extends Page_Controller
 
         // Initiate the gateway purchase
         $response = $service->initiate($gatewayData);
- 
+        
+        if(Director::isDev()) {
+            $response->getOmnipayResponse()->getRequest()->setTestEndpoint(\Controller::join_links($this->Link(),'mockgateway'));
+        }
+        
         return $response->redirectOrRespond();
     }
     
