@@ -66,8 +66,6 @@ class Order extends DataObject
     {
         $fields = parent::getCMSFields();
         
-        
-        
         return $fields;
     }
     

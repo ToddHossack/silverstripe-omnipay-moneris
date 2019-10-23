@@ -16,6 +16,8 @@ class PaymentPage extends Page
         'MerchantWebsite' => 'Varchar(100)',
         'MerchantPhysicalAddress' => 'Text',
         'MerchantPostalAddress' => 'Text',
+        'FormDisabled' => 'Boolean',
+        'FormDisabledMessage' => 'HTMLText'
 	];
 
     private static $casting = [
@@ -37,8 +39,22 @@ class PaymentPage extends Page
     {
         $fields = parent::getCMSFields();
         
-        $fields->findOrMakeTab('Root.Merchant',_t('PaymentPage.MerchantTab','Merchant Details'));
+        $fields->findOrMakeTab('Root.Maintenance',_t('PaymentPage.MaintenanceTab','Maintenance'));
 
+        $fields->addFieldsToTab('Root.Maintenance',[
+            CheckboxField::create(
+                'FormDisabled',
+                _t('PaymentPage.FormDisabled','Disable the Payment Form')
+            ),
+            HtmlEditorField::create(
+                'FormDisabledMessage',
+                _t('PaymentPage.FormDisabledMessage','Form Disabled Message')
+            )
+            ]
+        );
+        
+        $fields->findOrMakeTab('Root.Merchant',_t('PaymentPage.MerchantTab','Merchant Details'));
+        
         $fields->addFieldsToTab('Root.Merchant',[
             TextField::create('MerchantName',_t('PaymentPage.MerchantName','Merchant Name'),null,100),
             TextField::create('MerchantEmail',_t('PaymentPage.MerchantEmail','Email'),null,100),
@@ -139,35 +155,6 @@ class PaymentPage_Controller extends Page_Controller
         
     }
     
-    protected function xresultPaymentData($payment)
-    {
-        if(!$payment) {
-            return null;
-        }
-        $money = $payment->dbObject('Money');
-        $status = strtoupper($payment->Status);
-        $data = [
-            [
-                'Field' => 'Money',
-                'Title' => _t('Payment.MoneyAmount','Payment Amount'),
-                'Data' => $money->Nice()
-            ],
-            [
-                'Field' => 'Status',
-                'Title' => _t('Payment.Status', 'Status'),
-                'Data' => $payment->Status,
-                'TranslatedData' => _t('Payment.STATUS_'.strtoupper($payment->Status),$payment->Status)
-            ],
-            [
-                'Field' => 'Identifier',
-                'Title' => _t('Payment.Identifier', 'Reference No.'),
-                'Data' => $payment->Identifier
-            ]
-        ];
-        
-        return ArrayList::create($data);
-    }
-    
     protected function resultOrderData($payment)
     {
         $order = $payment->Order();
@@ -182,8 +169,6 @@ class PaymentPage_Controller extends Page_Controller
     
     public function mockgateway()
     {
-        //var_dump($this->request->postVars());
-        
         return [];
     }
     
@@ -202,6 +187,14 @@ class PaymentPage_Controller extends Page_Controller
      */
     public function PaymentForm()
     {
+        if($this->dataRecord->FormDisabled) {
+            if(!empty($this->dataRecord->FormDisabledMessage)) {
+                return $this->dataRecord->dbObject('FormDisabledMessage');
+            } else {
+                return _t('PaymentPage.FormDisabledMessage','Sorry, the payment form is temporarily unavailable. Please try again in a few hours.');
+            }
+            
+        }
         /*
          * Fields
          */
@@ -255,7 +248,7 @@ class PaymentPage_Controller extends Page_Controller
         
         // Gather gateway data
         $gatewayData = $this->gatewayDataForPurchase($payment,$data,$form);
-        
+
         // Use PurchaseService
         $service = ServiceFactory::create()->getService($payment, ServiceFactory::INTENT_PURCHASE);
 
