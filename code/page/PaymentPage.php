@@ -248,17 +248,17 @@ class PaymentPage_Controller extends Page_Controller
         
         // Gather gateway data
         $gatewayData = $this->gatewayDataForPurchase($payment,$data,$form);
-
+        
         // Use PurchaseService
         $service = ServiceFactory::create()->getService($payment, ServiceFactory::INTENT_PURCHASE);
 
         // Initiate the gateway purchase
         $response = $service->initiate($gatewayData);
-        
+
         if(Director::isDev()) {
             $response->getOmnipayResponse()->getRequest()->setTestEndpoint(\Controller::join_links($this->Link(),'mockgateway'));
         }
-        
+
         return $response->redirectOrRespond();
     }
     
@@ -284,14 +284,14 @@ class PaymentPage_Controller extends Page_Controller
         // Create payment
         $amount = ArrayUtility::data_get($data,'Money.Amount');
         $currency = ArrayUtility::data_get($data,'Money.Currency');
-        $formattedAmt = NumberUtility::format_currency($amount);
-        
+        $formattedAmt = NumberUtility::format_currency($amount,false,'.','');
+
         $payment = Payment::create()->init('Moneris', $formattedAmt, $currency);
         $payment->OrderID = $this->order->ID;
         $payment->Identifier = $this->order->OrderNumber;
         $payment->SuccessUrl = \Controller::join_links($this->Link(),'result',$payment->Identifier);
         $payment->FailureUrl = \Controller::join_links($this->Link(),'result',$payment->Identifier);
-        
+
         return $payment;
     }
     

@@ -16,7 +16,7 @@
 		"silverstripe/framework": "~3.1",
 		"silverstripe/silverstripe-omnipay": "2.5.x",
 		"toddhossack/omnipay-moneris-hpp": "dev-master",
-		"thossack/tkiutility": "^0.1.0"
+		"thossack/tkiutility": "^0.2.0"
 	},
 	"extra": {
 		"installer-name": "omnipay-moneris"
