@@ -15,7 +15,7 @@ class PaymentAdmin extends ModelAdmin
 	 * Currently it only allows deletes, so operates more like has_many 
 	 * @var array 
 	 */
-    private static $managed_models = ['Payment','Order'];
+    private static $managed_models = ['Order','Payment'];
 
     private static $menu_title = 'Payments';
 	

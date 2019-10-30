@@ -1,7 +1,7 @@
 <?php
 
 
-class Order extends DataObject
+class Order extends DataObject implements PermissionProvider
 {
     /* ---- Static variables ---- */
     private static $db = array(
@@ -24,12 +24,9 @@ class Order extends DataObject
    /**
 	 * @config
 	 */
-	private static $summary_fields = array(
-		'OrderNumber',
-        'Email',
-        'LastName',
-        'FirstName'
-	);
+	private static $summary_fields = ['OrderNumber','Email','LastName','FirstName','SummaryTotalPaid'];
+    
+    private static $noneditable_fields = ['FirstName','LastName','Email','Phone','OrderNumber','Comments'];
     
     /**
      * Mapping of DB fields to omnipay gateway parameters
@@ -39,7 +36,8 @@ class Order extends DataObject
         'FirstName' => 'billingFirstName',
         'LastName' => 'billingLastName',
         'Phone' => 'billingPhone',
-        'Email' => 'email'
+        'Email' => 'email',
+        'Comments' => 'note'
     ];
     
     
@@ -61,10 +59,51 @@ class Order extends DataObject
 	 *  Getters / setters
 	 * -------------------------------------------------------------------------
 	 */
+    public function SummaryTotalPaid()
+    {
+        return DBField::create_field('Currency',$this->TotalPaid());
+    }
     
+    
+    /* 
+	 * -------------------------------------------------------------------------
+	 *  Admin
+	 * -------------------------------------------------------------------------
+	 */
     public function getCMSFields()
     {
         $fields = parent::getCMSFields();
+        
+        $noneditable = $this->config()->get('noneditable_fields');
+        if(!empty($noneditable) && is_array($noneditable)) {
+            foreach($noneditable as $name) {
+                $field = $fields->dataFieldByName($name);
+                if($field && method_exists($field,'performReadonlyTransformation')) {
+                    $readonlyField = $field->performReadonlyTransformation();
+                    $fields->replaceField($name,$readonlyField);
+                }
+            }
+        }
+        
+        // Payments
+        $fields->removeByName('Payments');
+        $paymentsConfig = GridFieldConfig_RecordEditor::create();
+        $delete = $paymentsConfig->getComponentByType('GridFieldDeleteAction');
+        if($delete) {
+            $paymentsConfig->removeComponent($delete);
+        }
+
+        $addNew = $paymentsConfig->getComponentByType('GridFieldAddNewButton');
+        if($addNew) {
+            $paymentsConfig->removeComponent($addNew);
+        }
+        
+        $paymentsField = GridField::create('Payments', 
+            _t('Order.Payments', 'Payments'),
+            $this->Payments(),
+            $paymentsConfig
+        );
+        $fields->addFieldToTab('Root.Payments',$paymentsField);
         
         return $fields;
     }
@@ -94,7 +133,8 @@ class Order extends DataObject
             'LastName' => _t('Order.LastName','Last Name / Business Name'),
             'Email' => _t('Order.Email','Email'),
             'Phone' => _t('Order.Phone','Phone'),
-            'Comments' => _t('Order.Comments','Comments')
+            'Comments' => _t('Order.Comments','Comments'),
+            'SummaryTotalPaid' => _t('Order.SummaryTotalPaid','Total Paid')
 		);
 	}
     
@@ -127,10 +167,83 @@ class Order extends DataObject
    public function providePermissions()
    {
        return array(
-           
-       );
+           'Order_CREATE' => array(
+                'name' => _t('Order.Order_CREATE', 'Create orders'),
+                'category' => _t('Payment.PAYMENT_PERMISSIONS', 'Payment actions'),
+                'sort' => 220
+            ),
+            'Order_VIEW' => array(
+                'name' => _t('Order.Order_VIEW', 'View orders'),
+                'category' => _t('Payment.PAYMENT_PERMISSIONS', 'Payment actions'),
+                'sort' => 230
+            ),
+           'Order_EDIT' => array(
+                'name' => _t('Order.Order_EDIT', 'Edit orders'),
+                'category' => _t('Payment.PAYMENT_PERMISSIONS', 'Payment actions'),
+                'sort' => 235
+            ),
+            'Order_DELETE' => array(
+                'name' => _t('PaymentExtension.Order_DELETE', 'Delete orders'),
+                'category' => _t('Payment.PAYMENT_PERMISSIONS', 'Payment actions'),
+                'sort' => 240
+            ),
+        );
    }
    
-  
+    public function canCreate($member = null) 
+    {
+        $extended = $this->extendedCan(__FUNCTION__, $member);
+		if($extended !== null) {
+			return $extended;
+		}
+        
+        if(Permission::check('ADMIN', 'any', $member)) {
+            return true;
+        }
+        // Pseudo editing
+		return Permission::check('Order_CREATE', 'any', $member);
+	}
+    
+    public function canView($member = null)
+    {
+        $extended = $this->extendedCan(__FUNCTION__, $member);
+		if($extended !== null) {
+			return $extended;
+		}
+        
+        if(Permission::check('ADMIN', 'any', $member)) {
+            return true;
+        }
+	
+		return Permission::check('Order_VIEW', 'any', $member);
+	}
+    
+    public function canEdit($member = null) 
+    {
+        $extended = $this->extendedCan(__FUNCTION__, $member);
+		if($extended !== null) {
+			return $extended;
+		}
+        
+        if(Permission::check('ADMIN', 'any', $member)) {
+            return true;
+        }
+        // Pseudo editing
+		return Permission::check('Order_EDIT', 'any', $member);
+	}
+    
+    public function canDelete($member = null) 
+    {
+        $extended = $this->extendedCan(__FUNCTION__, $member);
+		if($extended !== null) {
+			return $extended;
+		}
+        
+        if(Permission::check('ADMIN', 'any', $member)) {
+            return true;
+        }
+		return Permission::check('Order_DELETE', 'any', $member);
+	}
+    
 }
 

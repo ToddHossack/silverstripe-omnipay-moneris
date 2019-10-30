@@ -34,13 +34,15 @@ class PaymentGatewayControllerExtension extends Extension
         if(Director::isDev()) {
             return;
         }
-        if($gatewayName === 'Moneris') {
+        // @todo - change to IP moneris IP check instead. Referer doesn't show in responses
+        // from dev portal
+        $referrerHost = parse_url($_SERVER['HTTP_REFERER'],PHP_URL_HOST);
+        if($gatewayName === 'Moneris' && $referrerHost) {
             $params = GatewayInfo::getConfigSetting('Moneris','parameters');
             $gateway = \Injector::inst()->get('Omnipay\Common\GatewayFactory')->create($gatewayName);
             $gateway->initialize($params);
             $request = $gateway->completePurchase();
             $endpointHost = parse_url($request->getEndpoint(),PHP_URL_HOST);
-            $referrerHost = parse_url($_SERVER['HTTP_REFERER'],PHP_URL_HOST);
             if(strcasecmp($referrerHost,$endpointHost) !== 0) {
                 throw new Exception(_t('PaymentGatewayControllerExtension.BadReferrer', 'The referring host is invalid'));
             }
