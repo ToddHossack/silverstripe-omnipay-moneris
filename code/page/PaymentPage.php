@@ -277,7 +277,14 @@ class PaymentPage_Controller extends Page_Controller
             'LastName',
             'Email',
             'Phone',
-            'Comments'
+            'Comments',
+            'MailingAddressLine1',
+            'MailingAddressLine2',
+            'MailingSuburb',
+            'MailingCity',
+            'MailingState',
+            'MailingCountry',
+            'MailingPostCode'
         ]);
         $this->order->write();
         

@@ -12,7 +12,15 @@ class Order extends DataObject implements PermissionProvider
         'Phone' => 'Varchar(20)',
         // Order
         'OrderNumber' => 'Varchar(34)', // Unique order ID
-        'Comments' => 'Varchar(255)'
+        'Comments' => 'Varchar(255)',
+        // Mailing address
+        'MailingAddressLine1' => 'Varchar',
+		'MailingAddressLine2' => 'Varchar',
+        'MailingSuburb' => 'Varchar',
+        'MailingCity' => 'Varchar',
+        'MailingState' => 'Varchar',
+        'MailingCountry' => 'Varchar(2)',
+        'MailingPostCode' => 'Varchar(16)'
 	);
     
     private static $extensions = ['Payable'];
@@ -134,7 +142,14 @@ class Order extends DataObject implements PermissionProvider
             'Email' => _t('Order.Email','Email'),
             'Phone' => _t('Order.Phone','Phone'),
             'Comments' => _t('Order.Comments','Comments'),
-            'SummaryTotalPaid' => _t('Order.SummaryTotalPaid','Total Paid')
+            'SummaryTotalPaid' => _t('Order.SummaryTotalPaid','Total Paid'),
+            'MailingAddressLine1' => _t('Order.MailingAddressLine1','Address Line 1'),
+            'MailingAddressLine2' => _t('Order.MailingAddressLine2','Address Line 2'),
+            'MailingSuburb' => _t('Order.MailingSuburb','Suburb'),
+            'MailingCity' => _t('Order.MailingCity','Town/City'),
+            'MailingState' => _t('Order.MailingState','Province'),
+            'MailingCountry' => _t('Order.MailingCountry','Country'),
+            'MailingPostCode' => _t('Order.MailingPostCode','Post Code')
 		);
 	}
     
