@@ -34,7 +34,7 @@ class PaymentGatewayControllerExtension extends Extension
         if(Director::isDev()) {
             return;
         }
-        // @todo - change to IP moneris IP check instead. Referer doesn't show in responses
+        // @todo - change to moneris IP check instead. Referer doesn't show in responses
         // from dev portal
         $referrerHost = parse_url($_SERVER['HTTP_REFERER'],PHP_URL_HOST);
         if($gatewayName === 'Moneris' && $referrerHost) {

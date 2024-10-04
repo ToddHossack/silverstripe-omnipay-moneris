@@ -36,30 +36,6 @@ class Order extends DataObject implements PermissionProvider
     
     private static $noneditable_fields = ['FirstName','LastName','Email','Phone','OrderNumber','Comments'];
     
-    /**
-     * Mapping of DB fields to omnipay gateway parameters
-     * @var array 
-     */
-    private static $gateway_data_map = [
-        'FirstName' => 'billingFirstName',
-        'LastName' => 'billingLastName',
-        'Phone' => 'billingPhone',
-        'Email' => 'email',
-        'Comments' => 'note'
-    ];
-    
-    
-    public function dataForGateway()
-    {
-        $dataMap = $this->config()->get('gateway_data_map',Config::INHERITED) ?: [];
-
-        $data = [];
-        foreach($dataMap as $field => $param) {
-            $data[$param] = $this->getField($field);
-        }
-        return $data;
-    }
-   
     private static $default_sort = 'ID DESC';
     
     /* 

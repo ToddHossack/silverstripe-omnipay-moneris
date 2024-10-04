@@ -78,7 +78,7 @@ class PaymentPage_Controller extends Page_Controller
      * Session timeout
      * @var int 
      */
-    private static $session_timeout = 300;  // 1 hour
+    private static $session_timeout = 600;  // 10 minutes
     
 
     private static $allowed_actions = [
@@ -174,7 +174,7 @@ class PaymentPage_Controller extends Page_Controller
     
     /*
 	|--------------------------------------------------------------------------
-	| Forms
+	| Form
 	|--------------------------------------------------------------------------
 	*/
     
@@ -238,6 +238,13 @@ class PaymentPage_Controller extends Page_Controller
         );
     }
 
+   
+    /**
+     * Handles submission of payment form
+     * @param array $data
+     * @param Form $form
+     * @return \SS_HTTPResponse
+     */
     public function submitPaymentForm($data, Form $form)
     {
         // Create payment
@@ -262,12 +269,19 @@ class PaymentPage_Controller extends Page_Controller
         return $response->redirectOrRespond();
     }
     
+    /*
+	|--------------------------------------------------------------------------
+	| Order / payment
+	|--------------------------------------------------------------------------
+	*/
+    
     /**
-     * Override in subclasses to customise.
-     * @param type $data
-     * @param type $form
+     * Creates order and payment
+     * @param array $data
+     * @param Form $form
+     * @return Payment
      */
-    protected function createPurchasePayment($data,$form)
+    protected function createPurchasePayment($data,Form $form)
     {
         // Create order
         $orderClass = $this->config()->get('order_class',Config::UNINHERITED);
@@ -310,7 +324,28 @@ class PaymentPage_Controller extends Page_Controller
      */
     protected function gatewayDataForPurchase($payment,$data,$form)
     {
-        return $this->order->dataForGateway();
+        $data = [
+            // Order data
+            'order_no' => $this->order->getField('OrderNumber'),
+            'contact_details' => [
+                'first_name' => $this->order->getField('FirstName'),
+                'last_name' => $this->order->getField('LastName'),
+                'email' => $this->order->getField('Email'),
+                'phone' => $this->order->getField('Phone')
+            ],
+            'billing_details' => [
+                'address_1' => $this->order->getField('MailingAddressLine1'),
+                'address_2' => $this->order->getField('MailingAddressLine2'),
+                'city' => $this->order->getField('MailingCity'),
+                'province' => $this->order->getField('MailingState'),
+                'country' => $this->order->getField('MailingCountry'),
+                'postal_code' => $this->order->getField('MailingPostCode')
+            ],
+             // Payment data
+            'txn_total' => $payment->getAmount()
+        ];
+        
+        return $data;
     }
     
     /*
