@@ -38,4 +38,5 @@ Only:
 #    required_fields:
 #      - 'store_id'
 #      - 'api_token'
-#      - 'charge_total'
+#      - 'checkout_id'
+#      - 'environment' 
