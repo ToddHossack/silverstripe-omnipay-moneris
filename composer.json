@@ -15,7 +15,7 @@
 		"silverstripe/cms": "~3.1",
 		"silverstripe/framework": "~3.1",
 		"silverstripe/silverstripe-omnipay": "2.5.x",
-		"toddhossack/omnipay-moneris-checkout": "dev-moneris-checkout",
+		"toddhossack/omnipay-moneris-checkout": "dev-master",
 		"thossack/tkiutility": "^0.2.0"
 	},
 	"extra": {
