@@ -11,13 +11,15 @@ Name: gateway-example
 #    use_authorize: false
 #    use_static_route: true
 #    parameters:
-#      psStoreId: '[dev store id]'
-#      hppKey: '[dev hpp key]'
-#      testMode: true
+#      store_id: '[dev store_id]'
+#      api_token: '[dev api_token]'
+#      checkout_id: '[dev checkout_id]'
+#      environment: 'qa'
 #    required_fields:
-#      - 'ps_store_id'
-#      - 'hpp_key'
-#      - 'charge_total'
+#      - 'store_id'
+#      - 'api_token'
+#      - 'checkout_id'
+#      - 'environment' 
 
 ---
 Only:
@@ -29,10 +31,12 @@ Only:
 #    use_authorize: false
 #    use_static_route: true
 #    parameters:
-#      psStoreId: '[live store id]'
-#      hppKey: '[live hpp key]'
-#      testMode: true
+#      store_id: '[prod store_id]'
+#      api_token: '[prod api_token]'
+#      checkout_id: '[prod checkout_id]'
+#      environment: 'prod'
 #    required_fields:
-#      - 'ps_store_id'
-#      - 'hpp_key'
-#      - 'charge_total'
+#      - 'store_id'
+#      - 'api_token'
+#      - 'checkout_id'
+#      - 'environment' 

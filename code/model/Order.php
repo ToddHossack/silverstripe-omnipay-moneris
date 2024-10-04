@@ -13,7 +13,14 @@ class Order extends DataObject implements PermissionProvider
         // Order
         'OrderNumber' => 'Varchar(34)', // Unique order ID
         'Comments' => 'Varchar(255)',
-        // Mailing address
+        // Billing address
+        'BillingAddressLine1' => 'Varchar',
+		'BillingAddressLine2' => 'Varchar',
+        'BillingCity' => 'Varchar',
+        'BillingState' => 'Varchar',
+        'BillingCountry' => 'Varchar(2)',
+        'BillingPostCode' => 'Varchar(16)',
+        // Shipping address
         'MailingAddressLine1' => 'Varchar',
 		'MailingAddressLine2' => 'Varchar',
         'MailingSuburb' => 'Varchar',
@@ -25,41 +32,31 @@ class Order extends DataObject implements PermissionProvider
     
     private static $extensions = ['Payable'];
     
-    private static $result_fields = ['FirstName','LastName','Email','Phone','OrderNumber','Comments'];
+    private static $order_fields = ['OrderNumber','Comments'];
+    
+    private static $contact_fields = ['FirstName','LastName','Email','Phone'];
+    
+    private static $billing_address_fields = ['BillingAddressLine1','BillingAddressLine2','BillingCity','BillingState','BillingCountry','BillingPostCode'];
+    
+    private static $mailing_address_fields = ['MailingAddressLine1','MailingAddressLine2','MailingCity','MailingState','MailingCountry','MailingPostCode'];
+    
+    /**
+     * Config setting for whether to persist the billing address in the database.
+     * Default is false.
+     * @var boolean 
+     */
+    private static $persist_billing_address = false;
     
     protected $_cachedResultData;       // instance cache
     
+     
    /**
 	 * @config
 	 */
 	private static $summary_fields = ['OrderNumber','Email','LastName','FirstName','SummaryTotalPaid'];
     
-    private static $noneditable_fields = ['FirstName','LastName','Email','Phone','OrderNumber','Comments'];
+    private static $editable_fields = [];
     
-    /**
-     * Mapping of DB fields to omnipay gateway parameters
-     * @var array 
-     */
-    private static $gateway_data_map = [
-        'FirstName' => 'billingFirstName',
-        'LastName' => 'billingLastName',
-        'Phone' => 'billingPhone',
-        'Email' => 'email',
-        'Comments' => 'note'
-    ];
-    
-    
-    public function dataForGateway()
-    {
-        $dataMap = $this->config()->get('gateway_data_map',Config::INHERITED) ?: [];
-
-        $data = [];
-        foreach($dataMap as $field => $param) {
-            $data[$param] = $this->getField($field);
-        }
-        return $data;
-    }
-   
     private static $default_sort = 'ID DESC';
     
     /* 
@@ -82,9 +79,25 @@ class Order extends DataObject implements PermissionProvider
     {
         $fields = parent::getCMSFields();
         
-        $noneditable = $this->config()->get('noneditable_fields');
-        if(!empty($noneditable) && is_array($noneditable)) {
-            foreach($noneditable as $name) {
+        $editable = (array) $this->config()->get('editable_fields');
+        $dbFields = $this->config()->get('db', Config::INHERITED);
+
+        $fields->removeByName('OrderNumber');
+        $fields->insertAfter('MailingPostCode',
+            TextField::create('OrderNumber', _t('Order.OrderNumber','Order Number'))
+        );
+        
+        $fields->removeByName('Comments');
+        $fields->insertAfter('OrderNumber',
+            TextField::create('Comments', _t('Order.Comments','Comments'))
+        );
+        
+        if(!empty($dbFields) && is_array($dbFields)) {
+            foreach($dbFields as $name => $type) {
+                // Skip editable
+                if(in_array($name,$editable)) {
+                    continue;
+                }
                 $field = $fields->dataFieldByName($name);
                 if($field && method_exists($field,'performReadonlyTransformation')) {
                     $readonlyField = $field->performReadonlyTransformation();
@@ -92,6 +105,23 @@ class Order extends DataObject implements PermissionProvider
                 }
             }
         }
+        // Insert headers
+        $fields->insertBefore('FirstName',
+            HeaderField::create('ContactDetailsHeading', _t('Order.ContactDetailsHeading','Contact Details'),3)
+        );
+        
+        $fields->insertBefore('BillingAddressLine1',
+            HeaderField::create('BillingAddressHeading',_t('Order.BillingAddressHeading','Billing Address'),3)
+        );
+        
+        $fields->insertBefore('MailingAddressLine1',
+            HeaderField::create('MailingAddressHeading',_t('Order.MailingAddressHeading','Mailing Address'),3)
+        );
+        
+        $fields->insertBefore('OrderNumber',
+            HeaderField::create('OrderDetailsHeading', _t('Order.OrderDetailsHeading','Order Details'),3)
+        );
+        
         
         // Payments
         $fields->removeByName('Payments');
@@ -143,6 +173,14 @@ class Order extends DataObject implements PermissionProvider
             'Phone' => _t('Order.Phone','Phone'),
             'Comments' => _t('Order.Comments','Comments'),
             'SummaryTotalPaid' => _t('Order.SummaryTotalPaid','Total Paid'),
+             // Billing address
+            'BillingAddressLine1' => _t('Order.BillingAddressLine1','Address Line 1'),
+            'BillingAddressLine2' => _t('Order.BillingAddressLine2','Address Line 2'),
+            'BillingCity' => _t('Order.BillingCity','Town/City'),
+            'BillingState' => _t('Order.BillingState','Province'),
+            'BillingCountry' => _t('Order.BillingCountry','Country'),
+            'BillingPostCode' => _t('Order.BillingPostCode','Post Code'),
+             // Mailing address
             'MailingAddressLine1' => _t('Order.MailingAddressLine1','Address Line 1'),
             'MailingAddressLine2' => _t('Order.MailingAddressLine2','Address Line 2'),
             'MailingSuburb' => _t('Order.MailingSuburb','Suburb'),
@@ -156,24 +194,39 @@ class Order extends DataObject implements PermissionProvider
     
     public function resultData()
     {
-
         if(is_null($this->_cachedResultData)) {
-            $fields = $this->config()->get('result_fields',Config::UNINHERITED);
+            $map = [
+                'ContactDetails' => 'contact_fields',
+                'OrderData' => 'order_fields',
+                'MailingAddress' => 'mailing_address_fields',
+            ];
+            
             $data = [];
             $labels = $this->translatedLabels();
-            foreach($fields as $field) {
-                $data[] = [
-                    'Field' => $field,
-                    'Title' => isset($labels[$field]) ? $labels[$field] : $field,
-                    'Data' => $this->$field
-                ];
+            foreach($map as $label => $key) {
+                $fields = $this->config()->get($key,Config::FIRST_SET);
+                $list = [];
+                if(!empty($fields)) {
+                    foreach($fields as $field) {
+                        $value = $this->getField($field);
+                        // Skip fields without a value
+                        if(!is_null($value)) {
+                            $list[] = [
+                                'Field' => $field,
+                                'Title' => isset($labels[$field]) ? $labels[$field] : $field,
+                                'Data' => $value
+                            ];
+                        }
+                    }
+                }
+                $data[$label] = (count($list)) ? ArrayList::create($list) : null;
             }
-            $this->_cachedResultData = ArrayList::create($data);
+            
+            $this->_cachedResultData = $data;
         }
-        
         return $this->_cachedResultData;
     }
-        
+    
     /**
     * 
     * @see DataObject::providePermissions()

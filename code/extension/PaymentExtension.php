@@ -4,6 +4,10 @@
 class PaymentExtension extends DataExtension implements PermissionProvider
 {
  
+    private static $db = array(
+        'GatewayTicket' => 'Varchar(100)',
+    );
+    
     public function TranslatedStatus()
     {
         $status = strtoupper((string) $this->owner->Status);
@@ -24,6 +28,19 @@ class PaymentExtension extends DataExtension implements PermissionProvider
             ->first();
     }
     
+    /**
+     * Finds the last error message for the payment
+     * @return \PaymentMessage
+     */
+    public function LastError()
+    {
+        return $this->owner->Messages()
+            ->filter([
+                'ClassName:PartialMatch' => 'Error'
+            ])
+            ->sort('ID','DESC')
+            ->first();
+    }
     
     /**
      * Provide payment related permissions. The permissions are:

@@ -13,15 +13,19 @@
 			<td>$LastMessage.Message</td>
 		</tr>
 		<tr>
+			<th><%t PaymentMessage.Code 'Response Code' %>:</th>
+			<td>$LastMessage.Code</td>
+		</tr>
+		<tr>
 			<th><%t Payment.Status 'Status' %>:</th>
 			<td>$Payment.TranslatedStatus</td>
 		</tr>
 		<tr>
-			<th><%t Payment.db_Reference 'Reference' %>:</th>
+			<th><%t Payment.db_Reference 'Reference #' %>:</th>
 			<td>$Payment.TransactionReference</td>
 		</tr>
 		<tr>
-			<th><%t Payment.MoneyAmount 'Payment Amount' %>:</th>
+			<th><%t Payment.MoneyAmount 'Amount' %>:</th>
 			<td>$Payment.Money.Nice</td>
 		</tr>
 	</table>

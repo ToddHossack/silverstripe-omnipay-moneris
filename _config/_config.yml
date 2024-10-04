@@ -14,10 +14,6 @@ Payment:
   extensions:
     - PaymentExtension
 
-SilverStripe\Omnipay\Service\PurchaseService:
-  extensions: 
-    - PurchaseServiceExtension
-
 SilverStripe\Omnipay\PaymentGatewayController:
   extensions:
     - PaymentGatewayControllerExtension
