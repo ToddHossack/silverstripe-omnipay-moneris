@@ -2,6 +2,7 @@
 
 use SilverStripe\Omnipay\PaymentGatewayController;
 use SilverStripe\Omnipay\Service\ServiceFactory;
+use Omnipay\Moneris\Message\PreloadRequest;
 
 use Tki\Utility\ArrayUtility;
 use Tki\Utility\NumberUtility;
@@ -67,8 +68,6 @@ class PaymentPage extends Page
         return $fields;
     }
     
-    
-    
 }
 
 
@@ -93,6 +92,23 @@ class PaymentPage_Controller extends Page_Controller
     protected $order;
     
     private static $order_class = 'Order';
+    
+    private static $fieldsToParameterMap = [
+        // Order
+        'FirstName' => 'contact_details.first_name',
+        'LastName' => 'contact_details.last_name',
+        'Email' => 'contact_details.email',
+        'Phone' => 'contact_details.phone',
+        'OrderNumber' => 'contact_details.order_no',
+        'MailingAddressLine1' => 'shipping_details.address_1',
+		'MailingAddressLine2' => 'shipping_details.address_2',
+        'MailingCity' => 'shipping_details.city',
+        'MailingState' => 'shipping_details.province',
+        'MailingCountry' => 'shipping_details.country',
+        'MailingPostCode' => 'shipping_details.postal_code',
+        // Payment
+        'Money[Amount]' => 'txn_total'
+    ];
     
     public function init() 
     {
@@ -208,16 +224,36 @@ class PaymentPage_Controller extends Page_Controller
         /*
          * Validation
          */
-        $required = $this->paymentFormRequired();
-            
-        $form = Form::create($this, 'PaymentForm', $fields, $actions, $required);
+        $validator = $this->paymentFormValidator();
+        $rules = $this->paymentFormValidatorRules();
+        if(!empty($rules) && ($validator instanceof PaymentFormValidator)) {
+            $validator->setRules($rules);
+        }
+        
+        $form = Form::create($this, 'PaymentForm', $fields, $actions, $validator);
 
         return $form;
     }
     
-    protected function paymentFormRequired()
+    protected function paymentFormValidator()
     {
-        return RequiredFields::create(['Money']);
+        return PaymentFormValidator::create(['Money']);
+    }
+    
+    protected function paymentFormValidatorRules()
+    {
+        // Get preload request parameter config
+        $parameterCfg = PreloadRequest::condensedParameterConfig();
+        // Field to parameter map
+        $fieldsMap = $this->config()->get('fieldsToParameterMap');
+        // Make rules based on parameter config
+        $rules = [];
+        if(is_array($fieldsMap)) {
+            foreach($fieldsMap as $field => $path) {
+                $rules[$field] = ArrayUtility::data_get($parameterCfg,$path,[]);
+            }
+        }
+        return $rules;
     }
     
     protected function paymentFormActions()
