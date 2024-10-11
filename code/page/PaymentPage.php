@@ -84,6 +84,7 @@ class PaymentPage_Controller extends Page_Controller
         'PaymentForm',
         //'CompletedForm',
         //'StartOverForm',
+        'pay',
         'result',
     ];
     
@@ -117,77 +118,7 @@ class PaymentPage_Controller extends Page_Controller
             $this->clearPaymentSession(get_class($this));
         }
     }
-    /*
-	|--------------------------------------------------------------------------
-	| Actions
-	|--------------------------------------------------------------------------
-	*/
-    
-    
-    protected function result()
-    {
-        $viewVars = [
-            'Title' => 'Payment Result',
-            'Result' => null,
-			'PaymentData' => null,
-            'OrderData' => null
-		];
-        
-        // Find and validate identifier
-        $identifier = $this->getIdentifierFromRequest();
-        if(!$this->validatePaymentIdentifier($identifier)) {
-            return $this->showResponse($viewVars);
-        }
-       
-        // Validate session
-        if(!$this->validatePaymentSession($identifier)) {
-            return $this->showResponse($viewVars);
-        }
    
-        /*
-         * Find payment
-         */
-        $payment = $this->findPaymentByIdentifier($identifier);
-        if(!$payment) {
-            $this->addError(_t('PaymentPage_Controller.PaymentNotFound','Transaction details not found'));
-        } else {
-            $viewVars['Payment'] = $payment;
-            $viewVars['OrderData'] = $this->resultOrderData($payment);
-            $viewVars['Result'] = ArrayData::create($this->resultFromPaymentStatus($payment));
-            $viewVars['LastMessage'] = $payment->LastMessage();
-        }
-        
-        $this->addResponseVars($viewVars);
-        
-        return $this->showResponse($viewVars);
-    }
-    
-    /**
-     * Override in sub-classes to customise template variables
-     * @param array $vars
-     */
-    protected function addResponseVars(&$vars)
-    {
-        
-    }
-    
-    protected function resultOrderData($payment)
-    {
-        $order = $payment->Order();
-        return ($order) ? $order->resultData() : null;
-    }
-    
-    protected function showResponse($vars)
-    {
-        $vars['PaymentErrors'] = $this->paymentErrors;
-        return $this->customise(ArrayData::create($vars));
-    }
-    
-    public function mockgateway()
-    {
-        return [];
-    }
-    
     /*
 	|--------------------------------------------------------------------------
 	| Form
@@ -287,8 +218,13 @@ class PaymentPage_Controller extends Page_Controller
         $payment = $this->createPurchasePayment($data,$form);
 
         // Init session
-        $this->initPaymentSession($payment);
+        $sessionData = $this->initSession([
+            'payment_identifier' => $payment->Identifier,
+        ]);
         
+        /*
+         * Gateway request
+         */
         // Gather gateway data
         $gatewayData = $this->gatewayDataForPurchase($payment,$data,$form);
         
@@ -297,12 +233,148 @@ class PaymentPage_Controller extends Page_Controller
 
         // Initiate the gateway purchase
         $response = $service->initiate($gatewayData);
-
-        if(Director::isDev()) {
-            $response->getOmnipayResponse()->getRequest()->setTestEndpoint(\Controller::join_links($this->Link(),'mockgateway'));
+        
+        /*
+         * Handle gateway response
+         */
+        
+        // Check for errors
+        $this->checkResponseForErrors($response,$payment);
+        $omnipayResponse = $response->getOmnipayResponse();
+        $this->checkResponseForErrors($omnipayResponse);
+        
+        if($this->paymentErrors && $this->paymentErrors->count()) {
+            $sessionData['paymentErrors'] = $this->paymentErrors->toArray();
+            Session::set(get_class($this),$sessionData);
+            return $this->redirectBack();
         }
-
-        return $response->redirectOrRespond();
+        
+        // Store data for redirect
+        if($omnipayResponse) {
+            $sessionData['response'] = $omnipayResponse->getData();
+            $sessionData['jsUrl'] = $omnipayResponse->getJsUrl();
+        }
+        
+        Session::set(get_class($this),$sessionData);
+        
+        return $this->redirect(\Controller::join_links($this->Link(),'pay'));
+    }
+    
+    protected function checkResponseForErrors($response,$payment=null)
+    {
+        if(!$response) {
+            $this->addError(_t('PaymentPage_Controller.NoGatewayResponse','No response from gateway.'));
+        }
+        // Error message
+        elseif($response instanceof \Omnipay\Moneris\Message\AbstractResponse) {
+            $error = $response->getError();
+            if($error) {
+                $this->addError($error);
+            }
+            elseif(!$response->isSuccessful()) {
+                $this->addError(_t('PaymentPage_Controller.GatewayResponseUnsuccessful','Gateway response unsuccessful.'));
+            }
+        }
+        // Error flag - try to find last error message related to payment
+        elseif($response instanceof \SilverStripe\Omnipay\Service\ServiceResponse) {
+            if($response->isError()) {
+                $lastError = $payment->LastError();
+                if($lastError) {
+                    $this->addError($lastError->Message);
+                }
+            }
+        }
+    }
+    
+    /*
+	|--------------------------------------------------------------------------
+	| Actions
+	|--------------------------------------------------------------------------
+	*/
+    protected function pay()
+    {
+        $viewVars = [
+            'Title' => 'Make Payment',
+            'Result' => null,
+			'PaymentData' => null,
+            'OrderData' => null,
+            'ticket' => null
+		];
+        
+        // Validate session
+        if(!$this->validatePaymentSession()) {
+            return $this->showResponse($viewVars);
+        }
+        
+        // Get ticket
+        $viewVars['ticket'] = $this->sessionGet(get_class($this),'response.ticket');
+        $this->addResponseVars($viewVars);
+        
+        return $this->showResponse($viewVars);
+    }
+    
+    protected function result()
+    {
+        $viewVars = [
+            'Title' => 'Payment Result',
+            'Result' => null,
+			'PaymentData' => null,
+            'OrderData' => null
+		];
+        
+        // Find and validate identifier
+        $identifier = $this->getIdentifierFromRequest();
+        if(!$this->validatePaymentIdentifier($identifier)) {
+            return $this->showResponse($viewVars);
+        }
+       
+        // Validate session
+        if(!$this->validatePaymentSession()) {
+            return $this->showResponse($viewVars);
+        }
+   
+        /*
+         * Find payment
+         */
+        $payment = $this->findPaymentByIdentifier($identifier);
+        if(!$payment) {
+            $this->addError(_t('PaymentPage_Controller.PaymentNotFound','Transaction details not found'));
+        } else {
+            $viewVars['Payment'] = $payment;
+            $viewVars['OrderData'] = $this->resultOrderData($payment);
+            $viewVars['Result'] = ArrayData::create($this->resultFromPaymentStatus($payment));
+            $viewVars['LastMessage'] = $payment->LastMessage();
+        }
+        
+        $this->addResponseVars($viewVars);
+        
+        return $this->showResponse($viewVars);
+    }
+    
+    /**
+     * Override in sub-classes to customise template variables
+     * @param array $vars
+     */
+    protected function addResponseVars(&$vars)
+    {
+        
+    }
+    
+    protected function resultOrderData($payment)
+    {
+        $order = $payment->Order();
+        return ($order) ? $order->resultData() : null;
+    }
+    
+    protected function showResponse($vars)
+    {
+        $vars['PaymentErrors'] = $this->paymentErrors;
+        return $this->customise(ArrayData::create($vars));
+    }
+    
+    public function mockgateway()
+    {
+        return [];
     }
     
     /*
@@ -515,20 +587,20 @@ class PaymentPage_Controller extends Page_Controller
     
     /*
 	|--------------------------------------------------------------------------
-	| Security / permissions
+	| Session handling
 	|--------------------------------------------------------------------------
 	*/	
 	
-    protected function initPaymentSession($payment)
+    protected function initSession($data)
     {
+        $sessionData = (array) $data;
+        
         $sessionTimeout = (int) $this->config()->get('session_timeout');
-        
-        $sessionData = [
-            'payment_identifier' => $payment->Identifier,
-            'payment_submit_time' => ($sessionTimeout) ? time() + $sessionTimeout : 0
-        ];
-        
+        $sessionData['payment_submit_time'] = ($sessionTimeout) ? time() + $sessionTimeout : 0;
+     
         Session::set(get_class($this),$sessionData);
+        
+        return $sessionData;
     }
 	
     protected function clearPaymentSession($name)
@@ -538,7 +610,6 @@ class PaymentPage_Controller extends Page_Controller
     
     /**
      * Checks whether user's payment session has expired
-     * @param type $order
      * @return type
      */
 	protected function validatePaymentSession()
@@ -629,11 +700,35 @@ class PaymentPage_Controller extends Page_Controller
         if(is_null($this->paymentErrors)) {
             $this->paymentErrors = ArrayList::create();
         }
+        if(is_array($msg)) {
+            return $this->addErrorArray($msg);
+        }
         $this->paymentErrors->push(ArrayData::create([
             'Error' => $msg
         ]));
     }
     
+    protected function addErrorArray($arr)
+    {
+        if(is_array($arr)) {
+            foreach($msg as $field => $v) {
+                $msg = [];
+                if(is_string($field) && strlen($field)) {
+                    $msg = $field .': ';
+                }
+                if(is_string($v)) {
+                    $msg .= $v;
+                }
+                elseif(is_array($v)) {
+                    $msg .= implode("\n",$v);
+                }
+                $this->paymentErrors->push(ArrayData::create([
+                    'Error' => $msg
+                ]));
+            }
+        }
+    }
+
     protected function getIdentifierFromRequest()
     {
         $requestIdentifier = $this->request->param('ID');
