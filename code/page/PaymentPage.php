@@ -3,6 +3,9 @@
 use SilverStripe\Omnipay\PaymentGatewayController;
 use SilverStripe\Omnipay\Service\ServiceFactory;
 use Omnipay\Moneris\Message\PreloadRequest;
+use Omnipay\Moneris\Message\PreloadResponse;
+
+use SilverStripe\Omnipay\GatewayInfo;
 
 use Tki\Utility\ArrayUtility;
 use Tki\Utility\NumberUtility;
@@ -77,7 +80,7 @@ class PaymentPage_Controller extends Page_Controller
      * Session timeout
      * @var int 
      */
-    private static $session_timeout = 600;  // 10 minutes
+    private static $session_timeout = 2000;  // 10 minutes
     
 
     private static $allowed_actions = [
@@ -248,13 +251,13 @@ class PaymentPage_Controller extends Page_Controller
             Session::set(get_class($this),$sessionData);
             return $this->redirectBack();
         }
-        
+        //var_dump($sessionData); 
         // Store data for redirect
         if($omnipayResponse) {
-            $sessionData['response'] = $omnipayResponse->getData();
-            $sessionData['jsUrl'] = $omnipayResponse->getJsUrl();
+            $sessionData = array_merge($sessionData,(array) $omnipayResponse->getData());
         }
-        
+        //var_dump($omnipayResponse->getData());
+        //var_dump($sessionData); exit;
         Session::set(get_class($this),$sessionData);
         
         return $this->redirect(\Controller::join_links($this->Link(),'pay'));
@@ -291,29 +294,55 @@ class PaymentPage_Controller extends Page_Controller
 	| Actions
 	|--------------------------------------------------------------------------
 	*/
-    protected function pay()
+    public function pay()
     {
         $viewVars = [
             'Title' => 'Make Payment',
             'Result' => null,
 			'PaymentData' => null,
             'OrderData' => null,
-            'ticket' => null
+            'Ticket' => null
 		];
         
         // Validate session
         if(!$this->validatePaymentSession()) {
             return $this->showResponse($viewVars);
         }
-        
+
+        /* 
+         * View vars
+         */
         // Get ticket
-        $viewVars['ticket'] = $this->sessionGet(get_class($this),'response.ticket');
-        $this->addResponseVars($viewVars);
+        $gatewayTicket = $this->sessionGet(get_class($this),'response.ticket');
+        $viewVars['GatewayTicket'] = $gatewayTicket;
+
+        // Set environment mode
+        $params = GatewayInfo::getParameters('Moneris');
+        $env = isset($params['environment']) ? $params['environment'] : 'qa';
+        $viewVars['GatewayMode'] = $env;
+        // Require JS
+        $jsUrl = PreloadResponse::getJsUrlByEnvironment($env);
+        if(!$jsUrl) {
+            $this->addError(_t('PaymentPage_Controller.JsUrlNotFound','URL for gateway javascript not found.'));
+        } else {
+            if(empty($this->paymentErrors)) {
+                Requirements::clear();
+            }
+           /*
+            Requirements::customScript(<<<JS
+                mCheckout.setMode('$env');
+                mCheckout.startCheckout('$gatewayTicket');
+JS
+);
+            Requirements::javascript($jsUrl);
+            Requirements::javascript(OMNIPAY_MONERIS_DIR . '/js/moneris-checkout.js');
+            */
+        }
         
         return $this->showResponse($viewVars);
     }
     
-    protected function result()
+    public function result()
     {
         $viewVars = [
             'Title' => 'Payment Result',
@@ -346,7 +375,7 @@ class PaymentPage_Controller extends Page_Controller
             $viewVars['LastMessage'] = $payment->LastMessage();
         }
         
-        $this->addResponseVars($viewVars);
+        $this->addResultVars($viewVars);
         
         return $this->showResponse($viewVars);
     }
@@ -355,7 +384,7 @@ class PaymentPage_Controller extends Page_Controller
      * Override in sub-classes to customise template variables
      * @param array $vars
      */
-    protected function addResponseVars(&$vars)
+    protected function addResultVars(&$vars)
     {
         
     }

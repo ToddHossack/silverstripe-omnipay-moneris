@@ -4,7 +4,6 @@
 
 	<div class="typography">
 		<% if $Content %>$Content<% end_if %>
-	
 		$PaymentForm
 	</div>
 </div>
