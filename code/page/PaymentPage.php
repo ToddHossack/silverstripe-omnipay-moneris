@@ -4,6 +4,7 @@ use SilverStripe\Omnipay\PaymentGatewayController;
 use SilverStripe\Omnipay\Service\ServiceFactory;
 use Omnipay\Moneris\Message\PreloadRequest;
 use Omnipay\Moneris\Message\PreloadResponse;
+use Omnipay\Moneris\Config as MonerisConfig;
 
 use SilverStripe\Omnipay\GatewayInfo;
 
@@ -320,26 +321,47 @@ class PaymentPage_Controller extends Page_Controller
         $params = GatewayInfo::getParameters('Moneris');
         $env = isset($params['environment']) ? $params['environment'] : 'qa';
         $viewVars['GatewayMode'] = $env;
-        // Require JS
-        $jsUrl = PreloadResponse::getJsUrlByEnvironment($env);
-        if(!$jsUrl) {
+        
+        // URLs
+        $viewVars['FormUrl'] = \Director::absoluteURL($this->Link());
+        $viewVars['ResultUrl'] = \Director::absoluteURL(\Controller::join_links($this->Link(),'result'));
+
+        // JS response codes
+        $viewVars['ResponseCodes'] = json_encode(MonerisConfig::getCallbackResponseCodes(),JSON_HEX_APOS | JSON_HEX_QUOT);
+        
+        // JS Src
+        $jsSrc = MonerisConfig::getJsSrcByEnvironment($env);
+        if(!$jsSrc) {
             $this->addError(_t('PaymentPage_Controller.JsUrlNotFound','URL for gateway javascript not found.'));
         } else {
             if(empty($this->paymentErrors)) {
                 Requirements::clear();
+                Requirements::set_write_js_to_body(false);
+                Requirements::javascript($jsSrc);
+                //$viewVars['TestResponse'] = $this->testResponse();
             }
+            
            /*
             Requirements::customScript(<<<JS
                 mCheckout.setMode('$env');
                 mCheckout.startCheckout('$gatewayTicket');
 JS
 );
-            Requirements::javascript($jsUrl);
             Requirements::javascript(OMNIPAY_MONERIS_DIR . '/js/moneris-checkout.js');
             */
         }
         
         return $this->showResponse($viewVars);
+    }
+    
+    protected function testResponse()
+    {
+        $response = [
+			"handler" => "page_loaded",
+			"ticket" => "1539961059DdrvGG3Yj7rxvMAgvRlc4nqKXF7YjT",
+			"response_code" => "001"
+		];
+        return json_encode($response,JSON_HEX_APOS | JSON_HEX_QUOT);
     }
     
     public function result()
