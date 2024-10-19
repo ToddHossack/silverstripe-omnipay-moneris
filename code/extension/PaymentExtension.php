@@ -4,6 +4,10 @@
 class PaymentExtension extends DataExtension implements PermissionProvider
 {
  
+    private static $db = array(
+        'GatewayTicket' => 'Varchar(100)',
+    );
+    
     public function TranslatedStatus()
     {
         $status = strtoupper((string) $this->owner->Status);

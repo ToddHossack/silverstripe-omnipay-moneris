@@ -50,11 +50,13 @@
 		 */
 		var formUrl = '$FormUrl',
 			resultUrl = '$ResultUrl',
+			cancelUrl = '$CancelUrl',
 			gatewayTicket = '$GatewayTicket',
 			gatewayMode = '$GatewayMode',
-			responseCodes = parseJson('$ResponseCodes')
+			responseCodes = parseJson('$ResponseCodes'),
+			redirecting = false,
 			debug = true;
-
+			
 		/**
 		 * Extracts response code from json
 		 * @param {object} json
@@ -90,7 +92,7 @@
 			try {
 				// Use alert over iframe
 				if(document.getElementById('monerisCheckout')) {
-					window.alert(err + ': Please go back and try again.');
+					window.alert(err);
 				}
 				// Show error callout
 				else {
@@ -153,15 +155,32 @@
 		 */
 		var goToUrl = function(url) {
 			if(debug) console.log('goToUrl', url);
+			if(redirecting) return; // Redirection already in progress
+			redirecting = true;
 			try {
 				if(url) {
-					window.open(url);
+					window.location.href = url;
 				} else {
 					history.back();
 				}
 			} catch(e) {
 				showError('Redirection error. "'+ e +'"');
 				if(debug) console.log('goToUrl error',e);
+			}
+		}
+		
+		/**
+		 * Closes checkout and proceeds to given URL (optional)
+		 * @param {string} url - Navigate to URL
+		 * @returns {null}
+		 */
+		var closeCheckout = function(url) {
+			if(myCheckout) {
+				myCheckout.closeCheckout(" ");
+			}
+
+			if(url) {
+				goToUrl(url);
 			}
 		}
 
@@ -189,14 +208,18 @@
 					showError(getResponseErrorMessage(response));
 				break;
 				case 'payment_complete':
+					closeCheckout(resultUrl);
+				break;
 				case 'cancel_transaction':
-					myCheckout.closeCheckout(" ");
-					goToUrl(resultUrl);	// Proceed to result page
+					closeCheckout(cancelUrl);
 				break;
 				case 'page_closed':
-					if(debug) console.log('handle page_closed');
-					myCheckout.closeCheckout(" ");
-					goToUrl(formUrl);	// Return to form page
+					if(debug) {
+						console.log('handle page_closed');
+						console.log('history',history);
+					}
+					showError('Payment page closed. Redirecting...');
+					closeCheckout(formUrl);
 				break;
 				case 'page_loaded':
 				case 'payment_submitted':
