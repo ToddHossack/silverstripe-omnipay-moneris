@@ -1,4 +1,4 @@
-<% if $PaymentErrors %>
+<% if $PaymentErrors.count() %>
 <div class="PaymentPage__errors typography">
 	<h4><%t PaymentPage.Errors 'Errors' %></h4>
 	<ul>

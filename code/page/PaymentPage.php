@@ -219,6 +219,9 @@ class PaymentPage_Controller extends Page_Controller
      */
     public function submitPaymentForm($data, Form $form)
     {
+        // Init payment errors
+        $this->paymentErrors = ArrayList::create();
+        
         // Create payment
         $payment = $this->createPurchasePayment($data,$form);
 
@@ -255,7 +258,7 @@ class PaymentPage_Controller extends Page_Controller
         }
         
         // Save errors to session for redirect
-        if($this->paymentErrors && $this->paymentErrors->count()) {
+        if($this->paymentErrors->count()) {
             $sessionData['paymentErrors'] = $this->paymentErrors->toArray();
         }
 
@@ -272,7 +275,7 @@ class PaymentPage_Controller extends Page_Controller
         // Error message
         elseif($response instanceof \Omnipay\Moneris\Message\AbstractResponse) {
             $error = $response->getError();
-            if($error) {
+            if(!empty($error)) {
                 $this->addError($error);
             }
             elseif(!$response->isSuccessful()) {
@@ -308,7 +311,7 @@ class PaymentPage_Controller extends Page_Controller
         
         // Restore errors from session
         $this->paymentErrors = ArrayList::create($this->sessionGet(get_class($this),'paymentErrors',[]));
-        
+
         /*
          * Find payment
          */
@@ -346,7 +349,7 @@ class PaymentPage_Controller extends Page_Controller
         if(!$jsSrc) {
             $this->addError(_t('PaymentPage_Controller.JsUrlNotFound','URL for gateway javascript not found.'));
         } else {
-            if(empty($this->paymentErrors)) {
+            if(!$this->paymentErrors->count()) {
                 Requirements::clear();
                 Requirements::set_write_js_to_body(false);
                 Requirements::javascript($jsSrc);
@@ -439,34 +442,6 @@ JS
         
         // Save gateway ticket #
         $responseData = $omnipayResponse->getData();
-        // @todo 
-        // Gateway->completePurchase
-        // ReceiptRequest and ReceiptResponse class
-        // Ensure they have methods to get the data for saving in the message:
-        /*
-         * elseif ($data instanceof AbstractResponse) {
-            $output = array(
-                'Message' => $data->getMessage(),
-                'Code' => $data->getCode(),
-                'Reference' => $data->getTransactionReference(),
-                'Data' => $data->getData()
-            );
-        } elseif ($data instanceof AbstractRequest) {
-            $output = array(
-                'Token' => $data->getToken(),
-                'CardReference' => $data->getCardReference(),
-                'Amount' => $data->getAmount(),
-                'Currency' => $data->getCurrency(),
-                'Description' => $data->getDescription(),
-                'TransactionId' => $data->getTransactionId(),
-                'Reference' => $data->getTransactionReference(),
-                'ClientIp' => $data->getClientIp(),
-                'ReturnUrl' => $data->getReturnUrl(),
-                'CancelUrl' => $data->getCancelUrl(),
-                'NotifyUrl' => $data->getNotifyUrl(),
-                'Parameters' => $data->getParameters()
-            );
-         */
         
         /*
          * View variables

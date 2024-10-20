@@ -1,8 +1,8 @@
-<% if $PaymentErrors %><h1>$Title</h1><% end_if %>
+<% if $PaymentErrors.count() %><h1>$Title</h1><% end_if %>
 	
-	<div id="PaymentPageErrors" class="PaymentPage__errors typography" style="display: <% if $PaymentErrors %>block<% else %>none<% end_if %>; margin: 0 auto 10px auto; padding: 15px; background-color: #fff1cb; border: 1px solid #fcc917; width: 75%;">
+	<div id="PaymentPageErrors" class="PaymentPage__errors typography" style="display: <% if $PaymentErrors.count() %>block<% else %>none<% end_if %>; margin: 0 10px; padding: 15px; background-color: #fff1cb; border: 1px solid #fcc917; width: 75%;">
 		<h4 style="margin: 0; padding: 0; color: #b00; font-family: Trebuchet MS,Fira Sans Condensed,Arial Narrow,san-serif; margin: .8em 0 .4em; line-height: 1.2; font-size: 1.2rem; font-weight: 400;"><%t PaymentPage.Errors 'Error' %></h4>
-		<% if $PaymentErrors %>
+		<% if $PaymentErrors.count() %>
 		<ul>
 		<% loop $PaymentErrors %>
 			<li>$Error</li>
@@ -14,7 +14,7 @@
 		<a href="$StartLink" class="PaymentResult_action">Try again</a>
 	</div>
 
-	<% if $PaymentErrors %>
+	<% if $PaymentErrors.count() %>
 	<% else %>
 	<div id="monerisCheckout"></div>
 
