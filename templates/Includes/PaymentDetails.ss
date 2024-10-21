@@ -8,10 +8,10 @@
 			<th><%t PaymentMessage.Created 'Date/time' %>:</th>
 			<td>$LastMessage.Created</td>
 		</tr>
-		<tr>
+		<!--<tr>
 			<th><%t PaymentMessage.db_Message 'Message' %>:</th>
 			<td>$LastMessage.Message</td>
-		</tr>
+		</tr>-->
 		<tr>
 			<th><%t Payment.Status 'Status' %>:</th>
 			<td>$Payment.TranslatedStatus</td>

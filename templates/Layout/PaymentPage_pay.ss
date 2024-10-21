@@ -55,6 +55,7 @@
 			gatewayMode = '$GatewayMode',
 			responseCodes = parseJson('$ResponseCodes'),
 			redirecting = false,
+			closed = false,
 			debug = true;
 			
 		/**
@@ -154,8 +155,8 @@
 		 * @returns {null}
 		 */
 		var goToUrl = function(url) {
-			if(debug) console.log('goToUrl', url);
 			if(redirecting) return; // Redirection already in progress
+			if(debug) console.log('goToUrl', url);
 			redirecting = true;
 			try {
 				if(url) {
@@ -175,7 +176,10 @@
 		 * @returns {null}
 		 */
 		var closeCheckout = function(url) {
+			if(!myCheckout || closed) return;	// Already closed or cannot close
+
 			if(myCheckout) {
+				closed = true;
 				myCheckout.closeCheckout(" ");
 			}
 
@@ -214,11 +218,9 @@
 					closeCheckout(cancelUrl);
 				break;
 				case 'page_closed':
-					if(debug) {
-						console.log('handle page_closed');
-						console.log('history',history);
+					if(!redirecting) {
+						showError('Payment page closed. Redirecting...');
 					}
-					showError('Payment page closed. Redirecting...');
 					closeCheckout(formUrl);
 				break;
 				case 'page_loaded':

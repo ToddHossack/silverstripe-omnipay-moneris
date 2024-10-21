@@ -5,6 +5,7 @@ use SilverStripe\Omnipay\Service\ServiceFactory;
 use Omnipay\Moneris\Message\PreloadRequest;
 use Omnipay\Moneris\Message\PreloadResponse;
 use Omnipay\Moneris\Config as MonerisConfig;
+use Omnipay\Moneris\Helper;
 
 use SilverStripe\Omnipay\GatewayInfo;
 
@@ -267,7 +268,7 @@ class PaymentPage_Controller extends Page_Controller
         return $this->redirect(\Controller::join_links($this->Link(),'pay'));
     }
     
-    protected function checkResponseForErrors($response,$payment=null)
+    protected function checkResponseForErrors($response,$payment=null,$checkServiceResponse=true)
     {
         if(!$response) {
             $this->addError(_t('PaymentPage_Controller.NoGatewayResponse','No response from gateway.'));
@@ -278,16 +279,13 @@ class PaymentPage_Controller extends Page_Controller
             if(!empty($error)) {
                 $this->addError($error);
             }
-            elseif(!$response->isSuccessful()) {
-                $this->addError(_t('PaymentPage_Controller.GatewayResponseUnsuccessful','Gateway response unsuccessful.'));
-            }
         }
         // Error flag - try to find last error message related to payment
-        elseif($response instanceof \SilverStripe\Omnipay\Service\ServiceResponse) {
+        elseif($response instanceof \SilverStripe\Omnipay\Service\ServiceResponse && $checkServiceResponse) {
             if($response->isError()) {
                 $lastError = $payment->LastError();
                 if($lastError) {
-                    $this->addError($lastError->Message);
+                    $this->addError($lastError->Message ?: $lastError->ClassName);
                 }
             }
         }
@@ -311,12 +309,11 @@ class PaymentPage_Controller extends Page_Controller
         
         // Restore errors from session
         $this->paymentErrors = ArrayList::create($this->sessionGet(get_class($this),'paymentErrors',[]));
-
         /*
          * Find payment
          */
         $payment = $this->findPaymentUsingSession();
-        
+
         if(!$payment) {
             return $this->showResponse($viewVars);
         }
@@ -424,25 +421,29 @@ JS
         /*
          * Gateway request
          */
+        $pending = ($payment->Status === 'PendingPurchase');
+        
         // Use PurchaseService
         $service = ServiceFactory::create()->getService($payment, ServiceFactory::INTENT_PURCHASE);
 
         // Receipt request (using complete method in service)
         $response = $service->complete([
             'ticket' => $payment->GatewayTicket
-        ]);
-        
+        ],true);
+
         /*
          * Handle gateway response
          */
         // Check for errors
-        $this->checkResponseForErrors($response,$payment);
+        $this->checkResponseForErrors($response,$payment,false);
         $omnipayResponse = $response->getOmnipayResponse();
-        $this->checkResponseForErrors($omnipayResponse);
+        if($pending) {
+            $this->checkResponseForErrors($omnipayResponse,$payment,false);
+        }
         
         // Save gateway ticket #
-        $responseData = $omnipayResponse->getData();
-        
+        $responseData = ($omnipayResponse) ? $omnipayResponse->getData() : null;
+        //Helper::debug($responseData['response']);
         /*
          * View variables
          */
@@ -451,7 +452,7 @@ JS
         $viewVars['Result'] = ArrayData::create($this->resultFromPaymentStatus($payment));
         $viewVars['LastMessage'] = $payment->LastMessage();
 
-        
+        //Helper::debug($this->paymentErrors->toArray());
         $this->addResultVars($viewVars);
         
         return $this->showResponse($viewVars);
@@ -786,9 +787,10 @@ JS
         if(!$this->validatePaymentSession()) {
             return null;
         }
-        
+
         // Find and validate identifier
-        $identifier = $this->sessionGet(get_class($this),'payment_identfier');
+        $identifier = $this->sessionGet(get_class($this),'payment_identifier');
+
         if(!$this->validatePaymentIdentifier($identifier)) {
             return null;
         }
