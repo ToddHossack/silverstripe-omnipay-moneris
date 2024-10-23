@@ -1,14 +1,5 @@
 <% if $PaymentErrors.count() %>
-<div class="PaymentPage__errors typography">
-	<h4><%t PaymentPage.Errors 'Errors' %></h4>
-	<ul>
-	<% loop $PaymentErrors %>
-		<li>$Error</li>
-	<% end_loop %>
-	</ul>
-	<a href="$StartLink" class="PaymentResult_action">Try again</a>
-</div>
-
+	<% include PaymentErrors %>
 <% else %>
 <div class="PaymentResult PaymentResult--$Result.Code.XML typography">
 	<h2 class="PaymentResult__heading">$Result.Type: $Result.Title
@@ -26,12 +17,11 @@
 		<span class="PaymentPage__URL">$AbsoluteLink</span>
 	</div>
 
-	<% if $OrderData %>
 	<h3 class="PaymentResult__heading">Order Details</h3>
 	<div class="PaymentResult__section">
-		<% include PaymentOrderDetails Order=$OrderData %>
+		<% include PaymentOrderDetails %>
 	</div>
-	<% end_if %>
+
 	<h3 class="PaymentResult__heading">Transaction Details </h3>
 	<div class="PaymentResult__section">
 		<% if $Payment %>

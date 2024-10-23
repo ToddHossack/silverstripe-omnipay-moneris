@@ -23,7 +23,10 @@ class PaymentPage extends Page
         'MerchantPhysicalAddress' => 'Text',
         'MerchantPostalAddress' => 'Text',
         'FormDisabled' => 'Boolean',
-        'FormDisabledMessage' => 'HTMLText'
+        'FormDisabledMessage' => 'HTMLText',
+        'AdminEmailRecipients' => 'Varchar(255)',
+        'EmailTitle' => 'Varchar(100)',
+        'SendCustomerEmail' => 'Boolean'
 	];
 
     private static $casting = [
@@ -45,6 +48,7 @@ class PaymentPage extends Page
     {
         $fields = parent::getCMSFields();
         
+        // Maintenance tab
         $fields->findOrMakeTab('Root.Maintenance',_t('PaymentPage.MaintenanceTab','Maintenance'));
 
         $fields->addFieldsToTab('Root.Maintenance',[
@@ -59,6 +63,7 @@ class PaymentPage extends Page
             ]
         );
         
+        // Merchant Details tab
         $fields->findOrMakeTab('Root.Merchant',_t('PaymentPage.MerchantTab','Merchant Details'));
         
         $fields->addFieldsToTab('Root.Merchant',[
@@ -68,6 +73,17 @@ class PaymentPage extends Page
             TextField::create('MerchantWebsite',_t('PaymentPage.MerchantWebsite','Website'),null,100),
             TextareaField::create('MerchantPhysicalAddress',_t('PaymentPage.MerchantPhysicalAddress','Physical Address')),
             TextareaField::create('MerchantPostalAddress',_t('PaymentPage.MerchantPostalAddress','Postal Address')),
+        ]);
+        
+        $fields->findOrMakeTab('Root.Merchant',_t('PaymentPage.MerchantTab','Merchant Details'));
+        
+        $fields->findOrMakeTab('Root.Email',_t('PaymentPage.EmailTab','Email'));
+        
+        $fields->addFieldsToTab('Root.Email',[
+            TextField::create('AdminEmailRecipients',_t('PaymentPage.AdminEmailRecipients','Admin Recipient(s) For Receipts'),null,255)
+                ->setDescription(_t('PaymentPage.AdminEmailRecipientsDesc','Use comma separated values for multiple recipients.')),
+            TextField::create('EmailTitle',_t('PaymentPage.EmailTitle','Email Title'),null,100),
+            CheckboxField::create('SendCustomerEmail',_t('PaymentPage.SendCustomerEmail','Send Receipt To Customer')),
         ]);
         
         return $fields;
@@ -82,13 +98,11 @@ class PaymentPage_Controller extends Page_Controller
      * Session timeout
      * @var int 
      */
-    private static $session_timeout = 2000;  // 10 minutes
+    private static $session_timeout = 200;  // 10 minutes
     
 
     private static $allowed_actions = [
         'PaymentForm',
-        //'CompletedForm',
-        //'StartOverForm',
         'pay',
         'cancel',
         'result',
@@ -122,6 +136,9 @@ class PaymentPage_Controller extends Page_Controller
 		parent::init();
         if($this->request->getVar('start')) {
             $this->clearPaymentSession(get_class($this));
+        } else {
+            // Get current errors from session
+            $this->paymentErrors = ArrayList::create($this->sessionGet(get_class($this),'paymentErrors',[]));
         }
     }
    
@@ -303,12 +320,9 @@ class PaymentPage_Controller extends Page_Controller
             'Title' => 'Make Payment',
             'Result' => null,
 			'PaymentData' => null,
-            'OrderData' => null,
             'Ticket' => null
 		];
         
-        // Restore errors from session
-        $this->paymentErrors = ArrayList::create($this->sessionGet(get_class($this),'paymentErrors',[]));
         /*
          * Find payment
          */
@@ -372,6 +386,7 @@ JS
             'Title' => 'Payment Result',
             'Result' => null,
 			'PaymentData' => null,
+            'ContactDetails' => null,
             'OrderData' => null
 		];
         
@@ -392,10 +407,14 @@ JS
         $response = $service->cancel();
         
         $viewVars['Payment'] = $payment;
-        $viewVars['OrderData'] = $this->resultOrderData($payment);
         $viewVars['Result'] = ArrayData::create($this->resultFromPaymentStatus($payment));
         $viewVars['LastMessage'] = $payment->LastMessage();
-
+        
+        $resultData = $this->resultOrderData($payment);
+        $viewVars['ContactDetails'] = $resultData->ContactDetails;
+        $viewVars['OrderData'] = $resultData->OrderData;
+        $viewVars['MailingAddress'] = $resultData->MailingAddress;
+        
         return $this->showResponse($viewVars);
     }
     
@@ -422,40 +441,115 @@ JS
          * Gateway request
          */
         $pending = ($payment->Status === 'PendingPurchase');
+        $successful = null;
         
-        // Use PurchaseService
-        $service = ServiceFactory::create()->getService($payment, ServiceFactory::INTENT_PURCHASE);
+        try {
+            // Use PurchaseService
+            $service = ServiceFactory::create()->getService($payment, ServiceFactory::INTENT_PURCHASE);
 
-        // Receipt request (using complete method in service)
-        $response = $service->complete([
-            'ticket' => $payment->GatewayTicket
-        ],true);
+            // Receipt request (using complete method in service)
+            $response = $service->complete([
+                'ticket' => $payment->GatewayTicket
+            ],true);
 
-        /*
-         * Handle gateway response
-         */
-        // Check for errors
-        $this->checkResponseForErrors($response,$payment,false);
-        $omnipayResponse = $response->getOmnipayResponse();
-        if($pending) {
-            $this->checkResponseForErrors($omnipayResponse,$payment,false);
+            /*
+             * Handle gateway response
+             */
+            // Check for errors
+            $this->checkResponseForErrors($response,$payment,false);
+            $omnipayResponse = $response->getOmnipayResponse();
+            if($pending) {
+                $this->checkResponseForErrors($omnipayResponse,$payment,false);
+            }
+            if($omnipayResponse) {
+                $successful = $omnipayResponse->isSuccessful();
+            }
+
+            //$responseData = ($omnipayResponse) ? $omnipayResponse->getData() : null;
+
+        } catch (\Exception $ex) {
+            $this->addError($ex->getMessage());
         }
         
-        // Save gateway ticket #
-        $responseData = ($omnipayResponse) ? $omnipayResponse->getData() : null;
-        //Helper::debug($responseData['response']);
         /*
          * View variables
          */
         $viewVars['Payment'] = $payment;
-        $viewVars['OrderData'] = $this->resultOrderData($payment);
         $viewVars['Result'] = ArrayData::create($this->resultFromPaymentStatus($payment));
         $viewVars['LastMessage'] = $payment->LastMessage();
+        
+        $resultData = $this->resultOrderData($payment);
+        $viewVars['ContactDetails'] = $resultData['ContactDetails'];
+        $viewVars['OrderData'] = $resultData['OrderData'];
+        $viewVars['MailingAddress'] = $resultData['MailingAddress'];
 
-        //Helper::debug($this->paymentErrors->toArray());
         $this->addResultVars($viewVars);
         
+        /*
+         * Send email
+         */
+        if($pending && $successful) {
+            $this->sendReceipt($viewVars,$payment);
+        }
+        
         return $this->showResponse($viewVars);
+    }
+    
+    protected function sendReceipt($viewVars,$payment)
+    {
+        $viewVars = array_merge($viewVars,[
+            'MerchantName' => $this->dataRecord->MerchantName,
+            'MerchantEmail' => $this->dataRecord->MerchantEmail,
+            'MerchantPhone' => $this->dataRecord->MerchantPhone,
+            'MerchantWebsite' => $this->dataRecord->MerchantWebsite,
+            'MerchantPhysicalAddressHTML' => $this->dataRecord->MerchantPhysicalAddressHTML,
+            'MerchantPostalAddressHTML' => $this->dataRecord->MerchantPostalAddressHTML,
+            'PaymentUrl' => str_replace('https://','',$this->dataRecord->AbsoluteLink())
+        ]);
+        
+        // Email title / subject
+        $viewVars['EmailTitle'] = trim($this->dataRecord->EmailTitle);
+        if(empty($viewVars['EmailTitle'])) {
+            $viewVars['EmailTitle'] = 'Payment Receipt';
+        }
+        $viewVars['EmailTitle'] .= ' (#'. $payment->Identifier .')';
+        
+        $emailVars = ArrayData::create($viewVars);
+        
+        // From
+        $from = Config::inst()->get('Email', 'admin_email');
+        /*
+         * Send admin email
+         */
+        if(!empty($this->dataRecord->AdminEmailRecipients)) {
+            $email = new Email();
+            $email
+                ->setFrom($from)
+                ->setTo($this->dataRecord->AdminEmailRecipients)
+                ->setSubject($viewVars['EmailTitle'])
+                ->setTemplate('PaymentResultEmail')
+                ->populateTemplate($emailVars);
+
+            $email->send();
+        }
+        
+        /*
+         * Send customer email
+         */
+        if(!empty($this->dataRecord->SendCustomerEmail)) {
+            $order = $payment->Order();
+            if($order && !empty($order->Email)) {
+                $email = new Email();
+                $email
+                    ->setFrom($from)
+                    ->setTo($order->Email)
+                    ->setSubject($viewVars['EmailTitle'])
+                    ->setTemplate('PaymentResultEmail')
+                    ->populateTemplate($emailVars);
+
+                $email->send();
+            }
+        }
     }
     
     /**
@@ -666,7 +760,14 @@ JS
             return false;
         }
         $expired = (time() - $tstamp) > $sessionTimeout;
-        
+        /*var_dump([
+            'sessionTimeout' => $sessionTimeout,
+            'time' => time(),
+            'tstamp' => $tstamp,
+            'diff' => time() - $tstamp,
+            'expired' => $expired
+        ]);
+        */
         if($expired) {
             $this->addError(_t('PaymentPage_Controller.SessionExpired','Sorry, your session has expired.'));
             return false;

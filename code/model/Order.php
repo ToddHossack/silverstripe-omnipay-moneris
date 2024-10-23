@@ -25,10 +25,15 @@ class Order extends DataObject implements PermissionProvider
     
     private static $extensions = ['Payable'];
     
-    private static $result_fields = ['FirstName','LastName','Email','Phone','OrderNumber','Comments'];
+    private static $order_fields = ['OrderNumber','Comments'];
+    
+    private static $contact_fields = ['FirstName','LastName','Email','Phone'];
+    
+    private static $mailing_address_fields = ['MailingAddressLine1','MailingAddressLine2','MailingCity','MailingState','MailingPostCode'];
     
     protected $_cachedResultData;       // instance cache
     
+     
    /**
 	 * @config
 	 */
@@ -132,24 +137,39 @@ class Order extends DataObject implements PermissionProvider
     
     public function resultData()
     {
-
         if(is_null($this->_cachedResultData)) {
-            $fields = $this->config()->get('result_fields',Config::UNINHERITED);
+            $map = [
+                'ContactDetails' => 'contact_fields',
+                'OrderData' => 'order_fields',
+                'MailingAddress' => 'mailing_address_fields',
+            ];
+            
             $data = [];
             $labels = $this->translatedLabels();
-            foreach($fields as $field) {
-                $data[] = [
-                    'Field' => $field,
-                    'Title' => isset($labels[$field]) ? $labels[$field] : $field,
-                    'Data' => $this->$field
-                ];
+            foreach($map as $label => $key) {
+                $fields = $this->config()->get($key,Config::FIRST_SET);
+                $list = [];
+                if(!empty($fields)) {
+                    foreach($fields as $field) {
+                        $value = $this->getField($field);
+                        // Skip fields without a value
+                        if(!is_null($value)) {
+                            $list[] = [
+                                'Field' => $field,
+                                'Title' => isset($labels[$field]) ? $labels[$field] : $field,
+                                'Data' => $value
+                            ];
+                        }
+                    }
+                }
+                $data[$label] = (count($list)) ? ArrayList::create($list) : null;
             }
-            $this->_cachedResultData = ArrayList::create($data);
+            
+            $this->_cachedResultData = $data;
         }
-        
         return $this->_cachedResultData;
     }
-        
+    
     /**
     * 
     * @see DataObject::providePermissions()
