@@ -13,7 +13,14 @@ class Order extends DataObject implements PermissionProvider
         // Order
         'OrderNumber' => 'Varchar(34)', // Unique order ID
         'Comments' => 'Varchar(255)',
-        // Mailing address
+        // Billing address
+        'BillingAddressLine1' => 'Varchar',
+		'BillingAddressLine2' => 'Varchar',
+        'BillingCity' => 'Varchar',
+        'BillingState' => 'Varchar',
+        'BillingCountry' => 'Varchar(2)',
+        'BillingPostCode' => 'Varchar(16)',
+        // Shipping address
         'MailingAddressLine1' => 'Varchar',
 		'MailingAddressLine2' => 'Varchar',
         'MailingSuburb' => 'Varchar',

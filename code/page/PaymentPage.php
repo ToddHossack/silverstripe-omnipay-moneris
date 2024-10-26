@@ -223,12 +223,70 @@ class PaymentPage_Controller extends Page_Controller
      */
     protected function paymentFormFields()
     {
-        return FieldList::create(
-            MoneyField::create('Money',_t('PaymentPage_Controller.Money','Payment amount'))
-        );
+        $fields = FieldList::create(array_merge(
+            $this->contactDetailsFormFields(),
+            $this->billingAddressFormFields()
+        ));
+        
+        $fields->push(MoneyField::create('Money',_t('PaymentPage_Controller.Money','Payment amount')));
+        
+        return $fields;
     }
-
-   
+    
+    protected function contactDetailsFormFields()
+    {
+        return [
+            HeaderField::create('ContactDetailsHeading', _t('Order.ContactDetailsHeading','Contact Details'),3),
+            TextField::create('FirstName', _t('Order.FirstName','First Name'), null, 30),
+            TextField::create('LastName', _t('Order.LastName','Last Name / Business Name'), null, 30)->addExtraClass('requiredField'),
+            EmailField::create('Email', _t('Order.Email','Email'),null,30)->addExtraClass('requiredField'),
+            TextField::create('Phone', _t('Order.Phone','Phone'),null,20)->addExtraClass('requiredField')
+        ];
+    }
+    
+    protected function billingAddressFormFields()
+    {
+        return [
+            HeaderField::create('BillingAddressHeading',_t('Order.BillingAddressHeading','Billing Address'),3),
+			TextField::create('BillingAddressLine1',_t('Order.BillingAddressLine1','Address line 1'),null,50)->addExtraClass('requiredField'),
+			TextField::create('BillingAddressLine2',_t('Order.BillingAddressLine2','Address line 2'),null,50),
+			TextField::create('BillingCity',_t('Order.BillingCity','City'),null,50)->addExtraClass('requiredField'),
+			DropdownField::create('BillingState','Province',$this->provinceList())->setEmptyString('Select province...')->addExtraClass('requiredField'),
+			TextField::create('BillingPostCode',_t('Order.BillingPostCode','PostCode'),null,20)->addExtraClass('requiredField')
+        ];
+    }
+    
+    protected function shippingAddressFormFields()
+    {
+        return FieldGroup::create([
+            HeaderField::create('MailingAddressHeading',_t('Order.MailingAddressHeading','Mailing address'),3),
+			TextField::create('MailingAddressLine1',_t('Order.MailingAddressLine1','Address line 1'),null,50),
+			TextField::create('MailingAddressLine2',_t('Order.MailingAddressLine2','Address line 2'),null,50),
+			TextField::create('MailingCity',_t('Order.MailingCity','City'),null,50),
+			DropdownField::create('MailingState','Province',$this->provinceList())->setEmptyString('Select province...'),
+			TextField::create('MailingPostCode',_t('Order.MailingPostCode','PostCode'),null,20)
+        ])->setName('MailingAddressFields');
+    }
+    
+    protected function provinceList()
+    {
+        return [
+            'AB' => 'Alberta',	
+            'BC' => 'British Columbia',
+            'MB' => 'Manitoba',
+            'NB' => 'New Brunswick',
+            'NL' => 'Newfoundland and Labrador',
+            'NT' => 'Northwest Territories',
+            'NS' => 'Nova Scotia',
+            'NU' => 'Nunavut',
+            'ON' => 'Ontario',	
+            'PE' => 'Prince Edward Island',
+            'QC' => 'Quebec',
+            'SK' => 'Saskatchewan',
+            'YT' => 'Yukon'
+        ];
+    }
+    
     /**
      * Handles submission of payment form
      * @param array $data
