@@ -4,7 +4,7 @@
 </head>
 <body style="font-family: Open Sans Regular,Helvetica,Arial,sans-serif; background-color: #fff;>
 	<div style="padding: 40px; color: #222; font-size: 1rem; line-height: 1.6; font-family: Open Sans Regular,Helvetica,Arial,sans-serif; line-height: 1.2">
-		<h1 style="margin: 0; font-size: 1.6em; font-family: Trebuchet MS,Fira Sans Condensed,Arial Narrow,sans-serif; line-height: 1.2; font-weight: 400; color: #003263;">$EmailTitle</h1>
+		<h1 style="margin: 0; padding: 10px 0 20px 0; font-size: 1.6em; font-family: Trebuchet MS,Fira Sans Condensed,Arial Narrow,sans-serif; line-height: 1.2; font-weight: 400; color: #003263;">$EmailTitle</h1>
 		<table cellspacing="0" cellpadding="0" style="font-family: inherit; border: 1px solid #ccc; border-collapse: collapse;">
 			<!-- Result heading -->
 			<tr>

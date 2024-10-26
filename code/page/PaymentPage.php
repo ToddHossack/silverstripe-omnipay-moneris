@@ -3,7 +3,7 @@
 use SilverStripe\Omnipay\PaymentGatewayController;
 use SilverStripe\Omnipay\Service\ServiceFactory;
 use Omnipay\Moneris\Message\PreloadRequest;
-use Omnipay\Moneris\Message\PreloadResponse;
+use Omnipay\Moneris\Message\ReceiptRequest;
 use Omnipay\Moneris\Config as MonerisConfig;
 use Omnipay\Moneris\Helper;
 
@@ -98,7 +98,7 @@ class PaymentPage_Controller extends Page_Controller
      * Session timeout
      * @var int 
      */
-    private static $session_timeout = 200;  // 10 minutes
+    private static $session_timeout = 600;  // 10 minutes
     
 
     private static $allowed_actions = [
@@ -254,25 +254,37 @@ class PaymentPage_Controller extends Page_Controller
         // Gather gateway data
         $gatewayData = $this->gatewayDataForPurchase($payment,$data,$form);
         
-        // Use PurchaseService
-        $service = ServiceFactory::create()->getService($payment, ServiceFactory::INTENT_PURCHASE);
-
-        // Initiate the gateway purchase
-        $response = $service->initiate($gatewayData);
+        // Mock
+        $params = GatewayInfo::getParameters('Moneris');
+        if(isset($params['mock']) && $params['mock'] === true) {
+            $payment->GatewayTicket = 'MockGatewayTicket1234567890987654321012345';
+            PreloadRequest::setMockResponseData($this->getMockPreloadResponseData($payment));
+        }
         
         /*
-         * Handle gateway response
+         * Gateway request / response
          */
         // Check for errors
-        $this->checkResponseForErrors($response,$payment);
-        $omnipayResponse = $response->getOmnipayResponse();
-        $this->checkResponseForErrors($omnipayResponse);
-        
-        // Save gateway ticket
-        if($omnipayResponse) {
-            $responseData = $omnipayResponse->getData();
-            $payment->GatewayTicket = ArrayUtility::data_get($responseData,'response.ticket');
-            $payment->write();
+        try {
+            // Use PurchaseService
+            $service = ServiceFactory::create()->getService($payment, ServiceFactory::INTENT_PURCHASE);
+
+            // Initiate the gateway purchase
+            $response = $service->initiate($gatewayData);
+            $this->checkResponseForErrors($response,$payment);
+            // Get response data
+            $omnipayResponse = ($response) ? $response->getOmnipayResponse() : null;
+            $this->checkResponseForErrors($omnipayResponse);
+            
+            // Save gateway ticket
+            if($omnipayResponse) {
+                $responseData = $omnipayResponse->getData();
+                $payment->GatewayTicket = ArrayUtility::data_get($responseData,'response.ticket');
+                $payment->write();
+            }
+            
+        } catch (\Exception $ex) {
+            $this->addError($ex->getMessage());
         }
         
         // Save errors to session for redirect
@@ -327,7 +339,6 @@ class PaymentPage_Controller extends Page_Controller
          * Find payment
          */
         $payment = $this->findPaymentUsingSession();
-
         if(!$payment) {
             return $this->showResponse($viewVars);
         }
@@ -364,17 +375,11 @@ class PaymentPage_Controller extends Page_Controller
                 Requirements::clear();
                 Requirements::set_write_js_to_body(false);
                 Requirements::javascript($jsSrc);
-                //$viewVars['TestResponse'] = $this->testResponseJson();
+                // Mock
+                if(isset($params['mock']) && $params['mock'] === true) {
+                    $viewVars['MockResponse'] = $this->getMockPayResponseData($payment);
+                }
             }
-            
-           /*
-            Requirements::customScript(<<<JS
-                mCheckout.setMode('$env');
-                mCheckout.startCheckout('$gatewayTicket');
-JS
-);
-            Requirements::javascript(OMNIPAY_MONERIS_DIR . '/js/moneris-checkout.js');
-            */
         }
         
         return $this->showResponse($viewVars);
@@ -406,14 +411,17 @@ JS
         $service = ServiceFactory::create()->getService($payment, ServiceFactory::INTENT_PURCHASE);
         $response = $service->cancel();
         
-        $viewVars['Payment'] = $payment;
-        $viewVars['Result'] = ArrayData::create($this->resultFromPaymentStatus($payment));
-        $viewVars['LastMessage'] = $payment->LastMessage();
-        
-        $resultData = $this->resultOrderData($payment);
-        $viewVars['ContactDetails'] = $resultData->ContactDetails;
-        $viewVars['OrderData'] = $resultData->OrderData;
-        $viewVars['MailingAddress'] = $resultData->MailingAddress;
+        /*
+         * View variables
+         */
+        try {
+            $this->addResultViewVars($viewVars,$payment);
+            
+            $this->extend('cancelViewVars', $viewVars, $payment);
+            
+        } catch (\Exception $ex) {
+            $this->addError($ex->getMessage());
+        }
         
         return $this->showResponse($viewVars);
     }
@@ -447,6 +455,12 @@ JS
             // Use PurchaseService
             $service = ServiceFactory::create()->getService($payment, ServiceFactory::INTENT_PURCHASE);
 
+            // Mock
+            $params = GatewayInfo::getParameters('Moneris');
+            if(isset($params['mock']) && $params['mock'] === true) {
+                ReceiptRequest::setMockResponseData($this->getMockReceiptResponseData($payment));
+            }
+            
             // Receipt request (using complete method in service)
             $response = $service->complete([
                 'ticket' => $payment->GatewayTicket
@@ -474,16 +488,9 @@ JS
         /*
          * View variables
          */
-        $viewVars['Payment'] = $payment;
-        $viewVars['Result'] = ArrayData::create($this->resultFromPaymentStatus($payment));
-        $viewVars['LastMessage'] = $payment->LastMessage();
+        $this->addResultViewVars($viewVars,$payment);
         
-        $resultData = $this->resultOrderData($payment);
-        $viewVars['ContactDetails'] = $resultData['ContactDetails'];
-        $viewVars['OrderData'] = $resultData['OrderData'];
-        $viewVars['MailingAddress'] = $resultData['MailingAddress'];
-
-        $this->addResultVars($viewVars);
+        $this->extend('resultViewVars', $viewVars, $payment);
         
         /*
          * Send email
@@ -537,12 +544,11 @@ JS
          * Send customer email
          */
         if(!empty($this->dataRecord->SendCustomerEmail)) {
-            $order = $payment->Order();
-            if($order && !empty($order->Email)) {
+            if($this->order && !empty($this->order->Email)) {
                 $email = new Email();
                 $email
                     ->setFrom($from)
-                    ->setTo($order->Email)
+                    ->setTo($this->order->Email)
                     ->setSubject($viewVars['EmailTitle'])
                     ->setTemplate('PaymentResultEmail')
                     ->populateTemplate($emailVars);
@@ -553,29 +559,31 @@ JS
     }
     
     /**
-     * Override in sub-classes to customise template variables
+     * Adds base payment / order view variables
      * @param array $vars
      */
-    protected function addResultVars(&$vars)
+    protected function addResultViewVars(&$viewVars,$payment)
     {
+        $this->order = $payment->Order();
         
+        $viewVars['Payment'] = $payment;
+        $viewVars['Result'] = ArrayData::create($this->resultFromPaymentStatus($payment));
+        $viewVars['LastMessage'] = $payment->LastMessage();
+        
+        $resultData = ($this->order) ? $this->order->resultData() : null;
+        
+        if(!empty($resultData)) {
+            $viewVars['ContactDetails'] = $resultData['ContactDetails'];
+            $viewVars['OrderData'] = $resultData['OrderData'];
+            $viewVars['MailingAddress'] = $resultData['MailingAddress'];
+        }
     }
     
-    protected function resultOrderData($payment)
-    {
-        $order = $payment->Order();
-        return ($order) ? $order->resultData() : null;
-    }
     
     protected function showResponse($vars)
     {
         $vars['PaymentErrors'] = $this->paymentErrors;
         return $this->customise(ArrayData::create($vars));
-    }
-    
-    public function mockgateway()
-    {
-        return [];
     }
     
     /*
@@ -760,14 +768,7 @@ JS
             return false;
         }
         $expired = (time() - $tstamp) > $sessionTimeout;
-        /*var_dump([
-            'sessionTimeout' => $sessionTimeout,
-            'time' => time(),
-            'tstamp' => $tstamp,
-            'diff' => time() - $tstamp,
-            'expired' => $expired
-        ]);
-        */
+
         if($expired) {
             $this->addError(_t('PaymentPage_Controller.SessionExpired','Sorry, your session has expired.'));
             return false;
@@ -849,7 +850,7 @@ JS
     protected function addErrorArray($arr)
     {
         if(is_array($arr)) {
-            foreach($msg as $field => $v) {
+            foreach($arr as $field => $v) {
                 $msg = [];
                 if(is_string($field) && strlen($field)) {
                     $msg = $field .': ';
@@ -913,78 +914,126 @@ JS
 	|--------------------------------------------------------------------------
 	*/
     
-    protected function testResponseJson()
+    protected function getMockPreloadResponseData($payment)
+    {
+        $data = [
+			"response" => [
+                "success" => "”true”",
+                "ticket" => "$payment->GatewayTicket"
+            ]
+		];
+        return $data;
+    }
+    
+    protected function getMockPayResponseData($payment)
     {
         $response = [
 			"handler" => "page_loaded",
-			"ticket" => "1539961059DdrvGG3Yj7rxvMAgvRlc4nqKXF7YjT",
+			"ticket" => $payment->GatewayTicket,
 			"response_code" => "001"
 		];
         return json_encode($response,JSON_HEX_APOS | JSON_HEX_QUOT);
     }
     
-    public function MockGatewayForm()
+    protected function getMockReceiptResponseData($payment)
     {
-        $fields = $this->mockGatewayFields();
-       
-        $actions = new FieldList(
-            FormAction::create('MockGatewayFormSubmit')->setTitle("Submit")
-        );
+        $order = $this->order ?: $payment->Order();
+        $data = [
+            'response' => [
+                'success' => 'true',
+                'request' => [
+                    'txn_total' => "'". $payment->getAmount() ."'",
+                    'cart' => [
+                        'items' => [
+                            '0' => [
+                                'product_code' => 'Misc',
+                                'description' => 'Comments: Mock Test'
+                            ]
+                        ],
+                        'subtotal' => "'". $payment->getAmount() ."'",
+                    ],
+                    'cust_info' => [
+                        'first_name' => ($order) ? $order->getField('FirstName') : '',
+                        'last_name' => ($order) ? $order->getField('LastName') : '',
+                        'phone' => ($order) ? $order->getField('Phone') : '',
+                        'email' => ($order) ? $order->getField('Email') : '',
+                    ],
+                    'shipping' => [
+                        'address_1' => ($order) ? $order->getField('MailingAddressLine1') : '',
+                        'address_2' => ($order) ? $order->getField('MailingAddressLine2') : '',
+                        'city' => ($order) ? $order->getField('MailingCity') : '',
+                        'country' => ($order) ? $order->getField('MailingCountry') : '',
+                        'province' => ($order) ? $order->getField('MailingState') : '',
+                        'postal_code' => ($order) ? $order->getField('MailingPostCode') : '',
+                    ],
+                    'billing' => null,
+                    'shipping_amount' => '0.00',
+                    'cc_total' => "'". $payment->getAmount() ."'",
+                    'pay_by_token' => '0',
+                    'cc' => [
+                        'first6last4' => '4242424242',
+                        'expiry' => '1124',
+                        'cardholder' => ($order) ? implode(' ',[$order->getField('FirstName'),$order->getField('LastName')]) : '',
+                    ],
+                    'ticket' => $payment->GatewayTicket,
+                    'cust_id' => null,
+                    'dynamic_descriptor' => null,
+                    'order_no' => $payment->Identifier,
+                    'eci' => 7
+                ],
 
-        $actionUrl = PaymentGatewayController::getStaticEndpointUrl('Moneris','complete');
-
-        $form = Form::create($this, 'MockGatewayForm', $fields, $actions, null);
-        $form->setFormAction($actionUrl);
-        $form->loadDataFrom($this->mockGatewayFormData());
-        return $form;
-    }
-    
-    protected function mockGatewayFormData()
-    {
-        return [
-            'response_order_id' => $this->request->postVar('order_id'),
-            'charge_total' => $this->request->postVar('charge_total'),
-            'cardholder' => implode(' ',[
-                $this->request->postVar('bill_first_name'),$this->request->postVar('bill_last_name')
-            ]),
-            'time_stamp' => date('H:i:s'),
-            'date_stamp' => date('Y-m-d')
+                'receipt' => [
+                    'result' => 'd',
+                    'order_no' => $payment->Identifier,
+                    'cc' => [
+                        'fraud' => [
+                            'cvd' => [
+                                'decision_origin' => 'Moneris',
+                                'result' => 1,
+                                'condition' => 0,
+                                'status' => 'success',
+                                'code' => '1M',
+                                'details' => null
+                            ],
+                            'avs' => [
+                                'decision_origin' => 'Moneris',
+                                'result' => 3,
+                                'condition' => 0,
+                                'status' => 'disabled',
+                                'code' => null,
+                                'details' => null
+                            ],
+                            '3d_secure' => [
+                                'decision_origin' => 'Moneris',
+                                'result' => 3,
+                                'condition' => 1,
+                                'status' => 'disabled',
+                                'code' => null,
+                                'details' => null
+                            ],
+                            'kount' => [
+                                'decision_origin' => 'Moneris',
+                                'result' => 2,
+                                'condition' => 1,
+                                'status' => 'failed_mandatory',
+                                'code' => null,
+                                'details' => [
+                                    'responseCode' => '987',
+                                    'message' => 'Invalid transaction',
+                                    'receiptID' => null,
+                                    'result' => null,
+                                    'score' => null,
+                                    'transactionID' => null
+                                ]
+                            ]
+                        ],
+                        'card_type' => 'V',
+                        'transaction_date_time' => '2024-10-23 12:17:05'
+                    ]
+                ]
+            ]
         ];
-    }
-    
-    protected function mockGatewayFields()
-    {
-        return FieldList::create(
-            TextField::create('response_order_id','Response Order ID', null, 50),
-            TextField::create('charge_total','Payment Amount', null, 25),
-            ReadonlyField::create('trans_name', 'Transaction Type', 'purchase', 30),
-            TextField::create('date_stamp', 'Date',null,30),
-            TextField::create('time_stamp', 'Time',null,30),
-            TextField::create('cardholder', 'Cardholder' ,null,30),
-            DropdownField::create('card', 'Card' ,[
-                'M' => 'Mastercard',
-                'V' => 'Visa',
-            ]),
-            DropdownField::create('response_code', 'Response Code' ,[
-                '' => 'Transaction not sent for authorisation',
-                40 => 'Transaction approved',
-                60 => 'Transaction declined'
-            ],40),
-            DropdownField::create('result', 'Result' ,[
-                '' => 'No result code',
-                0 => 'Declined or incomplete',
-                1 => 'Approved'
-            ],1),
-            DropdownField::create('message', 'Result' ,[
-                'APPROVED' => 'APPROVED',
-                'DECLINED' => 'DECLINED',
-                'CANCELLED' => 'CANCELLED'
-            ],1),
-            NumericField::create('iso_code', 'ISO Code' ,null,2),
-            TextField::create('bank_transaction_id', 'Reference Number' ,null,18),
-            TextField::create('bank_approval_code', 'Authorization Code' ,null,30),
-            TextField::create('transactionKey', 'Transaction Key' ,null,100)
-        );
+        return $data;
     }
     
 }

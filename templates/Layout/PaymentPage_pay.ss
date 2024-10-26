@@ -13,7 +13,10 @@
 		<% end_if %>
 		<a href="$StartLink" class="PaymentResult_action">Try again</a>
 	</div>
-
+	<div id="testActions" style="display: none;">
+		<button onclick="testResult()" class="PaymentResult_action" style="margin-right: 1rem" >Receipt</a>
+		<button onclick="testCancel()" class="PaymentResult_action" style="" >Cancel</a>
+	</div>
 	<% if $PaymentErrors.count() %>
 	<% else %>
 	<div id="monerisCheckout"></div>
@@ -48,7 +51,8 @@
 		/*
 		 * Variables
 		 */
-		var formUrl = '$FormUrl',
+		var myCheckout = null,
+			formUrl = '$FormUrl',
 			resultUrl = '$ResultUrl',
 			cancelUrl = '$CancelUrl',
 			gatewayTicket = '$GatewayTicket',
@@ -106,7 +110,7 @@
 		}
 		
 		/**
-		 * Determins if reponse object is considered an error.
+		 * Determines if reponse object is considered an error.
 		 * @param {object} json
 		 * @returns {string|null}
 		 */
@@ -137,17 +141,6 @@
 				return response.handler;
 			}
 			return null;
-		}
-		/*
-		 * Instantiate checkout
-		 */
-		 try { 
-			var myCheckout = new monerisCheckout();
-			myCheckout.setMode(gatewayMode);
-			myCheckout.setCheckoutDiv("monerisCheckout");
-		 } catch(e) {
-			showError('Initialization error. "'+ e +'"');
-			console.log('Initialization error',e);
 		}
 		
 		/**
@@ -235,35 +228,62 @@
 		
 		/*
 		 * Test
-		 
-		var testResponse = '$TestResponse';
-		callbackHandler(testResponse);
-		*/
-		/*
-		 * Set callbacks
 		 */
-		 try { 
-			myCheckout.setCallback("page_loaded", callbackHandler);
-			myCheckout.setCallback("cancel_transaction", callbackHandler);
-			myCheckout.setCallback("error_event", callbackHandler);
-			myCheckout.setCallback("payment_receipt", callbackHandler);
-			myCheckout.setCallback("payment_complete", callbackHandler);
-			myCheckout.setCallback("page_closed",callbackHandler);
-			myCheckout.setCallback("payment_submitted",callbackHandler);
-		} catch(e) {
-			showError('Set callback error. "'+ e +'"');
-			if(debug) console.log('Set callback error',e);
-		}
+		var testResponse = '$MockResponse';
+		if(testResponse) {
+			console.log('testResponse',testResponse);
+			document.getElementById("testActions").style.display = "block";
 
-		/*
-		 * Start
-		 */
-		try { 
-			myCheckout.startCheckout(gatewayTicket);
-		} catch(e) {
-			showError('Start checkout error. "'+ e +'"');
-			if(debug) console.log('Start checkout error',e);
+			var testResult = function(evt) {
+				goToUrl(resultUrl);
+			}
+
+			var testCancel = function(evt) {
+				goToUrl(cancelUrl);
+			}
+		} 
+
+		else { 
+
+		   /*
+			* Instantiate checkout
+			*/
+			try { 
+			   myCheckout = new monerisCheckout();
+			   myCheckout.setMode(gatewayMode);
+			   myCheckout.setCheckoutDiv("monerisCheckout");
+			} catch(e) {
+			   showError('Initialization error. "'+ e +'"');
+			   console.log('Initialization error',e);
+			}
+
+			/*
+			 * Set callbacks
+			 */
+			 try { 
+				myCheckout.setCallback("page_loaded", callbackHandler);
+				myCheckout.setCallback("cancel_transaction", callbackHandler);
+				myCheckout.setCallback("error_event", callbackHandler);
+				myCheckout.setCallback("payment_receipt", callbackHandler);
+				myCheckout.setCallback("payment_complete", callbackHandler);
+				myCheckout.setCallback("page_closed",callbackHandler);
+				myCheckout.setCallback("payment_submitted",callbackHandler);
+			} catch(e) {
+				showError('Set callback error. "'+ e +'"');
+				if(debug) console.log('Set callback error',e);
+			}
+
+		   /*
+			* Start
+			*/
+		   try { 
+			   myCheckout.startCheckout(gatewayTicket);
+		   } catch(e) {
+			   showError('Start checkout error. "'+ e +'"');
+			   if(debug) console.log('Start checkout error',e);
+		   }
 		}
+		
 		
 		
 	//]]></script>
