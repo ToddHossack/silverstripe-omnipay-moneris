@@ -121,6 +121,12 @@ class PaymentPage_Controller extends Page_Controller
         'Email' => 'contact_details.email',
         'Phone' => 'contact_details.phone',
         'OrderNumber' => 'contact_details.order_no',
+        'BillingAddressLine1' => 'billing_details.address_1',
+		'BillingAddressLine2' => 'billing_details.address_2',
+        'BillingCity' => 'billing_details.city',
+        'BillingState' => 'billing_details.province',
+        'BillingCountry' => 'billing_details.country',
+        'BillingPostCode' => 'billing_details.postal_code',
         'MailingAddressLine1' => 'shipping_details.address_1',
 		'MailingAddressLine2' => 'shipping_details.address_2',
         'MailingCity' => 'shipping_details.city',
@@ -191,7 +197,7 @@ class PaymentPage_Controller extends Page_Controller
     
     protected function paymentFormValidator()
     {
-        return PaymentFormValidator::create(['Money']);
+        return PaymentFormValidator::create(['LastName','Email','Money[Amount]']);
     }
     
     protected function paymentFormValidatorRules()
@@ -251,8 +257,8 @@ class PaymentPage_Controller extends Page_Controller
 			TextField::create('BillingAddressLine1',_t('Order.BillingAddressLine1','Address line 1'),null,50)->addExtraClass('requiredField'),
 			TextField::create('BillingAddressLine2',_t('Order.BillingAddressLine2','Address line 2'),null,50),
 			TextField::create('BillingCity',_t('Order.BillingCity','City'),null,50)->addExtraClass('requiredField'),
-			DropdownField::create('BillingState','Province',$this->provinceList())->setEmptyString('Select province...')->addExtraClass('requiredField'),
-			TextField::create('BillingPostCode',_t('Order.BillingPostCode','PostCode'),null,20)->addExtraClass('requiredField')
+			DropdownField::create('BillingState','Province',$this->provinceList())->setEmptyString('Select province...'),
+			TextField::create('BillingPostCode',_t('Order.BillingPostCode','Postal Code'),null,20)->addExtraClass('requiredField')
         ];
     }
     
@@ -264,7 +270,7 @@ class PaymentPage_Controller extends Page_Controller
 			TextField::create('MailingAddressLine2',_t('Order.MailingAddressLine2','Address line 2'),null,50),
 			TextField::create('MailingCity',_t('Order.MailingCity','City'),null,50),
 			DropdownField::create('MailingState','Province',$this->provinceList())->setEmptyString('Select province...'),
-			TextField::create('MailingPostCode',_t('Order.MailingPostCode','PostCode'),null,20)
+			TextField::create('MailingPostCode',_t('Order.MailingPostCode','Postal Code'),null,20)
         ])->setName('MailingAddressFields');
     }
     
@@ -311,7 +317,7 @@ class PaymentPage_Controller extends Page_Controller
          */
         // Gather gateway data
         $gatewayData = $this->gatewayDataForPurchase($payment,$data,$form);
-        
+
         // Mock
         $params = GatewayInfo::getParameters('Moneris');
         if(isset($params['mock']) && $params['mock'] === true) {
@@ -667,9 +673,14 @@ class PaymentPage_Controller extends Page_Controller
             'Email',
             'Phone',
             'Comments',
+            'BillingAddressLine1',
+            'BillingAddressLine2',
+            'BillingCity',
+            'BillingState',
+            'BillingCountry',
+            'BillingPostCode',
             'MailingAddressLine1',
             'MailingAddressLine2',
-            'MailingSuburb',
             'MailingCity',
             'MailingState',
             'MailingCountry',
@@ -709,6 +720,14 @@ class PaymentPage_Controller extends Page_Controller
                 'phone' => $this->order->getField('Phone')
             ],
             'billing_details' => [
+                'address_1' => $this->order->getField('BillingAddressLine1'),
+                'address_2' => $this->order->getField('BillingAddressLine2'),
+                'city' => $this->order->getField('BillingCity'),
+                'province' => $this->order->getField('BillingState'),
+                'country' => $this->order->getField('BillingCountry'),
+                'postal_code' => $this->order->getField('BillingPostCode')
+            ],
+            'shipping_details' => [
                 'address_1' => $this->order->getField('MailingAddressLine1'),
                 'address_2' => $this->order->getField('MailingAddressLine2'),
                 'city' => $this->order->getField('MailingCity'),

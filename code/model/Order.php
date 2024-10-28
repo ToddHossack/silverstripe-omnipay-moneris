@@ -46,7 +46,7 @@ class Order extends DataObject implements PermissionProvider
 	 */
 	private static $summary_fields = ['OrderNumber','Email','LastName','FirstName','SummaryTotalPaid'];
     
-    private static $noneditable_fields = ['FirstName','LastName','Email','Phone','OrderNumber','Comments'];
+    private static $editable_fields = [];
     
     private static $default_sort = 'ID DESC';
     
@@ -70,9 +70,25 @@ class Order extends DataObject implements PermissionProvider
     {
         $fields = parent::getCMSFields();
         
-        $noneditable = $this->config()->get('noneditable_fields');
-        if(!empty($noneditable) && is_array($noneditable)) {
-            foreach($noneditable as $name) {
+        $editable = (array) $this->config()->get('editable_fields');
+        $dbFields = Config::inst()->get(($this->class ? $this->class : get_class($this)), 'db', Config::INHERITED);
+
+        $fields->removeByName('OrderNumber');
+        $fields->insertAfter('MailingPostCode',
+            TextField::create('OrderNumber', _t('Order.OrderNumber','Order Number'))
+        );
+        
+        $fields->removeByName('Comments');
+        $fields->insertAfter('OrderNumber',
+            TextField::create('Comments', _t('Order.Comments','Comments'))
+        );
+        
+        if(!empty($dbFields) && is_array($dbFields)) {
+            foreach($dbFields as $name => $type) {
+                // Skip editable
+                if(in_array($name,$editable)) {
+                    continue;
+                }
                 $field = $fields->dataFieldByName($name);
                 if($field && method_exists($field,'performReadonlyTransformation')) {
                     $readonlyField = $field->performReadonlyTransformation();
@@ -80,6 +96,23 @@ class Order extends DataObject implements PermissionProvider
                 }
             }
         }
+        // Insert headers
+        $fields->insertBefore('FirstName',
+            HeaderField::create('ContactDetailsHeading', _t('Order.ContactDetailsHeading','Contact Details'),3)
+        );
+        
+        $fields->insertBefore('BillingAddressLine1',
+            HeaderField::create('BillingAddressHeading',_t('Order.BillingAddressHeading','Billing Address'),3)
+        );
+        
+        $fields->insertBefore('MailingAddressLine1',
+            HeaderField::create('MailingAddressHeading',_t('Order.MailingAddressHeading','Mailing Address'),3)
+        );
+        
+        $fields->insertBefore('OrderNumber',
+            HeaderField::create('OrderDetailsHeading', _t('Order.OrderDetailsHeading','Order Details'),3)
+        );
+        
         
         // Payments
         $fields->removeByName('Payments');
