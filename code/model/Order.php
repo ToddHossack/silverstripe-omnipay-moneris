@@ -36,7 +36,16 @@ class Order extends DataObject implements PermissionProvider
     
     private static $contact_fields = ['FirstName','LastName','Email','Phone'];
     
-    private static $mailing_address_fields = ['MailingAddressLine1','MailingAddressLine2','MailingCity','MailingState','MailingPostCode'];
+    private static $billing_address_fields = ['BillingAddressLine1','BillingAddressLine2','BillingCity','BillingState','BillingCountry','BillingPostCode'];
+    
+    private static $mailing_address_fields = ['MailingAddressLine1','MailingAddressLine2','MailingCity','MailingState','MailingCountry','MailingPostCode'];
+    
+    /**
+     * Config setting for whether to persist the billing address in the database.
+     * Default is false.
+     * @var boolean 
+     */
+    private static $persist_billing_address = false;
     
     protected $_cachedResultData;       // instance cache
     
@@ -71,7 +80,7 @@ class Order extends DataObject implements PermissionProvider
         $fields = parent::getCMSFields();
         
         $editable = (array) $this->config()->get('editable_fields');
-        $dbFields = Config::inst()->get(($this->class ? $this->class : get_class($this)), 'db', Config::INHERITED);
+        $dbFields = $this->config()->get('db', Config::INHERITED);
 
         $fields->removeByName('OrderNumber');
         $fields->insertAfter('MailingPostCode',
@@ -164,6 +173,14 @@ class Order extends DataObject implements PermissionProvider
             'Phone' => _t('Order.Phone','Phone'),
             'Comments' => _t('Order.Comments','Comments'),
             'SummaryTotalPaid' => _t('Order.SummaryTotalPaid','Total Paid'),
+             // Billing address
+            'BillingAddressLine1' => _t('Order.BillingAddressLine1','Address Line 1'),
+            'BillingAddressLine2' => _t('Order.BillingAddressLine2','Address Line 2'),
+            'BillingCity' => _t('Order.BillingCity','Town/City'),
+            'BillingState' => _t('Order.BillingState','Province'),
+            'BillingCountry' => _t('Order.BillingCountry','Country'),
+            'BillingPostCode' => _t('Order.BillingPostCode','Post Code'),
+             // Mailing address
             'MailingAddressLine1' => _t('Order.MailingAddressLine1','Address Line 1'),
             'MailingAddressLine2' => _t('Order.MailingAddressLine2','Address Line 2'),
             'MailingSuburb' => _t('Order.MailingSuburb','Suburb'),

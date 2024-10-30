@@ -234,6 +234,13 @@ class PaymentPage_Controller extends Page_Controller
             $this->billingAddressFormFields()
         ));
         
+        $fields->push(CheckboxField::create('ShippingAddressDifferent',_t('Order.ShippingAddressDifferent','Mailing address is different from billing address.')));
+        
+        // Shipping address
+        foreach($this->shippingAddressFormFields() as $field) {
+            $fields->push($field);
+        };
+        
         $fields->push(MoneyField::create('Money',_t('PaymentPage_Controller.Money','Payment amount')));
         
         return $fields;
@@ -257,7 +264,8 @@ class PaymentPage_Controller extends Page_Controller
 			TextField::create('BillingAddressLine1',_t('Order.BillingAddressLine1','Address line 1'),null,50)->addExtraClass('requiredField'),
 			TextField::create('BillingAddressLine2',_t('Order.BillingAddressLine2','Address line 2'),null,50),
 			TextField::create('BillingCity',_t('Order.BillingCity','City'),null,50)->addExtraClass('requiredField'),
-			DropdownField::create('BillingState','Province',$this->provinceList())->setEmptyString('Select province...'),
+			DropdownField::create('BillingState',_t('Order.BillingState','Province'),$this->provinceList())->setEmptyString('Select province...'),
+            DropdownField::create('BillingCountry',_t('Order.BillingCountry','Country'),$this->countryList())->setEmptyString('Select country...'),
 			TextField::create('BillingPostCode',_t('Order.BillingPostCode','Postal Code'),null,20)->addExtraClass('requiredField')
         ];
     }
@@ -270,8 +278,17 @@ class PaymentPage_Controller extends Page_Controller
 			TextField::create('MailingAddressLine2',_t('Order.MailingAddressLine2','Address line 2'),null,50),
 			TextField::create('MailingCity',_t('Order.MailingCity','City'),null,50),
 			DropdownField::create('MailingState','Province',$this->provinceList())->setEmptyString('Select province...'),
+            DropdownField::create('MailingCountry',_t('Order.MailingCountry','Country'),$this->countryList())->setEmptyString('Select country...'),
 			TextField::create('MailingPostCode',_t('Order.MailingPostCode','Postal Code'),null,20)
         ])->setName('MailingAddressFields');
+    }
+    
+    protected function countryList()
+    {
+        return [
+            'CA' => 'Canada',	
+            //'NZ' => 'New Zealand'
+        ];
     }
     
     protected function provinceList()
@@ -304,20 +321,27 @@ class PaymentPage_Controller extends Page_Controller
         // Init payment errors
         $this->paymentErrors = ArrayList::create();
         
-        // Create payment
-        $payment = $this->createPurchasePayment($data,$form);
+        // Config
+        $orderClass = $this->config()->get('order_class',Config::UNINHERITED);
+        $persistBilling = Config::inst()->get($orderClass, 'persist_billing_address',Config::INHERITED);
+        $billingAddressFields = Config::inst()->get($orderClass, 'billing_address_fields',Config::FIRST_SET);
+        
+        // Create order and payment
+        $this->order = $orderClass::create();
+        $payment = $this->createPurchasePayment($data,$form,$persistBilling,$billingAddressFields);
 
+        // Gather gateway data
+        $gatewayData = $this->gatewayDataForPurchase($payment,$form,$persistBilling,$billingAddressFields);
+        
         // Init session
         $sessionData = $this->initSession([
             'payment_identifier' => $payment->Identifier,
+            'billing_details' => $gatewayData['billing_details']
         ]);
         
         /*
          * Gateway request
          */
-        // Gather gateway data
-        $gatewayData = $this->gatewayDataForPurchase($payment,$data,$form);
-
         // Mock
         $params = GatewayInfo::getParameters('Moneris');
         if(isset($params['mock']) && $params['mock'] === true) {
@@ -359,6 +383,43 @@ class PaymentPage_Controller extends Page_Controller
         Session::set(get_class($this),$sessionData);
         
         return $this->redirect(\Controller::join_links($this->Link(),'pay'));
+    }
+    
+    protected function billingDetails($payment,$form,$persistBilling,$billingAddressFields)
+    {
+        $data = [];
+        if(empty($billingAddressFields) || !is_array($billingAddressFields)) {
+            return $data;
+        }
+        
+        $fieldsMap = $this->config()->get('fieldsToParameterMap');
+        $fieldList = $form->Fields();
+        
+        foreach($billingAddressFields as $fieldName) {
+            $parameter = isset($fieldsMap[$fieldName]) ? str_replace('billing_details.','',$fieldsMap[$fieldName]) : null;
+            if(!$parameter) {
+                continue;
+            }
+            // Persisted - get from payment
+            if($persistBilling) {
+                $data[$parameter] = $payment->{$fieldName};
+            }
+            // Not persisted - get from form
+            else {
+                $dataField = $fieldList->dataFieldByName($fieldName);
+                if($dataField) {
+                    $data[$parameter] = $dataField->Value();
+                }
+            }
+        }
+        
+        return $data;
+    }
+    
+    protected function useBillingAddressAsMailingAddress($form) 
+    {
+        $shippingAddressDifferentField = $form->Fields()->fieldByName('ShippingAddressDifferent');
+        return !($shippingAddressDifferentField && intval($shippingAddressDifferentField->Value()));
     }
     
     protected function checkResponseForErrors($response,$payment=null,$checkServiceResponse=true)
@@ -662,30 +723,29 @@ class PaymentPage_Controller extends Page_Controller
      * @param Form $form
      * @return Payment
      */
-    protected function createPurchasePayment($data,Form $form)
+    protected function createPurchasePayment($data,Form $form,$persistBilling,$billingAddressFields)
     {
-        // Create order
-        $orderClass = $this->config()->get('order_class',Config::UNINHERITED);
-        $this->order = $orderClass::create();
-        $form->saveInto($this->order,[
+        // Base fields to save
+        $fieldNames = [
             'FirstName',
             'LastName',
             'Email',
             'Phone',
             'Comments',
-            'BillingAddressLine1',
-            'BillingAddressLine2',
-            'BillingCity',
-            'BillingState',
-            'BillingCountry',
-            'BillingPostCode',
             'MailingAddressLine1',
             'MailingAddressLine2',
             'MailingCity',
             'MailingState',
             'MailingCountry',
             'MailingPostCode'
-        ]);
+        ];
+        
+        // Persist billing address if configured
+        if($persistBilling && !empty($billingAddressFields) && is_array($billingAddressFields)) {
+            $fieldNames = array_merge($fieldNames,$billingAddressFields);
+        }
+        
+        $form->saveInto($this->order,$fieldNames);
         $this->order->write();
         
         // Create payment
@@ -708,8 +768,9 @@ class PaymentPage_Controller extends Page_Controller
      * @param array $data
      * @param \Form $form
      */
-    protected function gatewayDataForPurchase($payment,$data,$form)
+    protected function gatewayDataForPurchase($payment,$form,$persistBilling,$billingAddressFields)
     {
+        
         $data = [
             // Order data
             'order_no' => $this->order->getField('OrderNumber'),
@@ -719,14 +780,7 @@ class PaymentPage_Controller extends Page_Controller
                 'email' => $this->order->getField('Email'),
                 'phone' => $this->order->getField('Phone')
             ],
-            'billing_details' => [
-                'address_1' => $this->order->getField('BillingAddressLine1'),
-                'address_2' => $this->order->getField('BillingAddressLine2'),
-                'city' => $this->order->getField('BillingCity'),
-                'province' => $this->order->getField('BillingState'),
-                'country' => $this->order->getField('BillingCountry'),
-                'postal_code' => $this->order->getField('BillingPostCode')
-            ],
+            'billing_details' => $this->billingDetails($payment,$form,$persistBilling,$billingAddressFields),
             'shipping_details' => [
                 'address_1' => $this->order->getField('MailingAddressLine1'),
                 'address_2' => $this->order->getField('MailingAddressLine2'),
