@@ -13,9 +13,9 @@
 		<% end_if %>
 		<a href="$StartLink" class="PaymentResult_action">Try again</a>
 	</div>
-	<div id="testActions" style="display: none;">
-		<button onclick="testResult()" class="PaymentResult_action" style="margin-right: 1rem" >Receipt</a>
-		<button onclick="testCancel()" class="PaymentResult_action" style="" >Cancel</a>
+	<div id="mockActions" style="display: none;">
+		<button onclick="mockResult()" class="PaymentResult_action" style="margin-right: 1rem" >Receipt</button>
+		<button onclick="mockCancel()" class="PaymentResult_action" style="" >Cancel</button>
 	</div>
 	<% if $PaymentErrors.count() %>
 	<% else %>
@@ -229,16 +229,16 @@
 		/*
 		 * Test
 		 */
-		var testResponse = '$MockResponse';
-		if(testResponse) {
-			console.log('testResponse',testResponse);
-			document.getElementById("testActions").style.display = "block";
+		var mockResponse = '$MockResponse';
+		if(mockResponse) {
+			console.log('mockResponse',mockResponse);
+			document.getElementById("mockActions").style.display = "block";
 
-			var testResult = function(evt) {
+			var mockResult = function(evt) {
 				goToUrl(resultUrl);
 			}
 
-			var testCancel = function(evt) {
+			var mockCancel = function(evt) {
 				goToUrl(cancelUrl);
 			}
 		} 
