@@ -1,5 +1,7 @@
 <?php
 
+use Omnipay\Moneris\Helper;
+
 /**
  * Required Fields allows you to set which fields need to be present before
  * submitting the form. Submit an array of arguments or each field as a separate
@@ -36,116 +38,52 @@ class PaymentFormValidator extends RequiredFields {
 	 *
 	 * @return boolean
 	 */
-	public function php($data) {
+	public function php($data)
+    {
 		$valid = parent::php($data);
-        
-        return $valid;
-		$fields = $this->form->Fields();
-
+       
 		if(!empty($this->rules)) {
+            
+            $fields = $this->form->Fields();
+            
 			foreach($this->rules as $fieldName => $cfg) {
-				if(empty($cfg)) {
+                $formField = $fields->dataFieldByName($fieldName);
+                
+                // Skip if no field or configuration
+				if(!$formField || empty($cfg)) {
 					continue;
 				}
-
-				$formField = $fields->dataFieldByName($fieldName);
-				
-				$error = true;
-
-				// submitted data for file upload fields come back as an array
-				$value = isset($data[$fieldName]) ? $data[$fieldName] : null;
-
-
-				if($formField && $error) {
-					$errorMessage = _t(
-						'Form.FIELDISREQUIRED',
-						'{name} is required',
-						array(
-							'name' => strip_tags(
-								'"' . ($formField->Title() ? $formField->Title() : $fieldName) . '"'
-							)
-						)
-					);
-
-					if($msg = $formField->getCustomValidationMessage()) {
-						$errorMessage = $msg;
-					}
-
-					$this->validationError(
+                
+                $fieldTitle = strip_tags(
+                    '"' . ($formField->Title() ? $formField->Title() : $fieldName) . '"'
+                );
+                
+                try {
+                    // Check length
+                    Helper::validateLimit($fieldTitle,$formField->Value(),$cfg);
+                    
+                    // Check min
+                    Helper::validateMin($fieldTitle,$formField->Value(),$cfg);
+                    
+                    // Check max
+                    Helper::validateMax($fieldTitle,$formField->Value(),$cfg);
+                    
+                    // Check invalid chars
+                    Helper::validateCharacters($fieldTitle,$formField->Value(),$cfg,false);
+                    
+                } catch (\Exception $ex) {
+                    $this->validationError(
 						$fieldName,
-						$errorMessage,
-						"required"
+						$ex->getMessage(),
+						'validation'
 					);
-
-					$valid = false;
-				}
+                    
+                    $valid = false;
+                }
 			}
 		}
 
 		return $valid;
 	}
-
-	/**
-	 * Adds a single required field to required fields stack.
-	 *
-	 * @param string $field
-	 *
-	 * @return RequiredFields
-	 */
-	public function addRequiredField($field) {
-		$this->required[$field] = $field;
-
-		return $this;
-	}
-
-	/**
-	 * Removes a required field
-	 *
-	 * @param string $field
-	 *
-	 * @return RequiredFields
-	 */
-	public function removeRequiredField($field) {
-		unset($this->required[$field]);
-
-		return $this;
-	}
-
-	/**
-	 * Add {@link RequiredField} objects together
-	 *
-	 * @param RequiredFields
-	 *
-	 * @return RequiredFields
-	 */
-	public function appendRequiredFields($requiredFields) {
-		$this->required = $this->required + ArrayLib::valuekey(
-			$requiredFields->getRequired()
-		);
-
-		return $this;
-	}
-
-	/**
-	 * Returns true if the named field is "required".
-	 *
-	 * Used by {@link FormField} to return a value for FormField::Required(),
-	 * to do things like show *s on the form template.
-	 *
-	 * @param string $fieldName
-	 *
-	 * @return boolean
-	 */
-	public function fieldIsRequired($fieldName) {
-		return isset($this->required[$fieldName]);
-	}
-
-	/**
-	 * Return the required fields
-	 *
-	 * @return array
-	 */
-	public function getRequired() {
-		return array_values($this->required);
-	}
+    
 }
