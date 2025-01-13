@@ -362,9 +362,9 @@ class PaymentPage_Controller extends Page_Controller
             $this->checkResponseForErrors($response,$payment);
             // Get response data
             $omnipayResponse = ($response) ? $response->getOmnipayResponse() : null;
-            //if($_SERVER['REMOTE_ADDR'] === '101.53.222.221') {
-                //Helper::debug($omnipayResponse ? $omnipayResponse->getData() : null); exit;
-            //}
+            /*if($_SERVER['REMOTE_ADDR'] === '') {
+                Helper::debug($omnipayResponse ? $omnipayResponse->getData() : null); exit;
+            }*/
             $this->checkResponseForErrors($omnipayResponse);
             
             // Save gateway ticket
