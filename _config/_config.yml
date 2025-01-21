@@ -1,5 +1,5 @@
 ---
-Name: omnipay-moneris-hpp
+Name: omnipay-moneris
 After:
   - 'framework/*'
   - 'cms/*'
@@ -18,15 +18,12 @@ SilverStripe\Omnipay\PaymentGatewayController:
   extensions:
     - PaymentGatewayControllerExtension
 
-# Dev only
-PaymentPage_Controller:
-  allowed_actions: 
-    - mockgateway
-    - MockGatewayForm
-    
----
-Only:
-  environment: 'live'
----
-PaymentPage_Controller:
-  allowed_actions: []
+GatewayRequestMessage:
+  store_parameters: true
+  extensions: 
+    - GatewayRequestMessageExtension
+
+GatewayResponseMessage:
+  store_data: true
+  extensions: 
+    - GatewayResponseMessageExtension

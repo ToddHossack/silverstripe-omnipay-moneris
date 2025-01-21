@@ -99,13 +99,12 @@ class PaymentPage_Controller extends Page_Controller
      * @var int 
      */
     private static $session_timeout = 600;  // 10 minutes
-    
 
     private static $allowed_actions = [
         'PaymentForm',
         'pay',
         'cancel',
-        'result',
+        'result'
     ];
     
     protected $errors = [];
@@ -509,7 +508,7 @@ class PaymentPage_Controller extends Page_Controller
                 }
             }
         }
-        
+
         return $this->showResponse($viewVars);
     }
     
@@ -606,9 +605,7 @@ class PaymentPage_Controller extends Page_Controller
             if($omnipayResponse) {
                 $successful = $omnipayResponse->isSuccessful();
             }
-
-            //$responseData = ($omnipayResponse) ? $omnipayResponse->getData() : null;
-
+            
         } catch (\Exception $ex) {
             $this->addError($ex->getMessage());
         }
