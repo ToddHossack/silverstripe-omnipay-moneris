@@ -3,7 +3,7 @@
 use Omnipay\Moneris\Helper;
 use Tki\Utility\JsonUtility;
 
-class GatewayResponseMessageExtension extends GatewayMessageExtension
+class GatewayErrorMessageExtension extends GatewayMessageExtension
 {
  
     /**

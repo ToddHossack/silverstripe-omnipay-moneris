@@ -18,12 +18,19 @@ SilverStripe\Omnipay\PaymentGatewayController:
   extensions:
     - PaymentGatewayControllerExtension
 
+GatewayMessage:
+  store_gateway_data: true
+  extensions: 
+    - GatewayMessageExtension
+    
 GatewayRequestMessage:
-  store_parameters: true
   extensions: 
     - GatewayRequestMessageExtension
 
 GatewayResponseMessage:
-  store_data: true
   extensions: 
     - GatewayResponseMessageExtension
+    
+GatewayErrorMessage:
+  extensions: 
+    - GatewayErrorMessageExtension
