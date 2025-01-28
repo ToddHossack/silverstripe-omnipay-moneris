@@ -12,8 +12,6 @@ class GatewayRequestMessageExtension extends GatewayMessageExtension
     
     /**
      * Specifies which parameters should be masked using asterisks
-     * Default key should not be present, but this will
-     * ensure it is dealt with if present.
      * @var array 
      */
     private static $mask = [

@@ -404,7 +404,7 @@ class PaymentPage_Controller extends Page_Controller
             }
             // Persisted - get from payment
             if($persistBilling) {
-                $data[$parameter] = $payment->{$fieldName};
+                $data[$parameter] = $this->order->{$fieldName};
             }
             // Not persisted - get from form
             else {
@@ -770,7 +770,6 @@ class PaymentPage_Controller extends Page_Controller
      */
     protected function gatewayDataForPurchase($payment,$form,$persistBilling,$billingAddressFields)
     {
-        
         $data = [
             // Order data
             'order_no' => $this->order->getField('OrderNumber'),
@@ -1065,7 +1064,7 @@ class PaymentPage_Controller extends Page_Controller
 		];
         return json_encode($response,JSON_HEX_APOS | JSON_HEX_QUOT);
     }
-    
+
     protected function getMockReceiptResponseData($payment)
     {
         $order = $this->order ?: $payment->Order();
