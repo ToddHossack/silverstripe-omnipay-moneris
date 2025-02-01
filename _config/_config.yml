@@ -11,6 +11,13 @@ Payment:
     - 'Moneris'
   has_one:
     Order: Order
+  summary_fields: 
+    ID: 'Payment ID'
+    Order.OrderNumber: 'Order Number'
+  searchable_fields:
+    - Money
+    - Status
+    - Created
   extensions:
     - PaymentExtension
 
